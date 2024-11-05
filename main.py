@@ -1,12 +1,23 @@
 import uvicorn
-from fastapi import FastAPI, BackgroundTasks
 import dotenv, os, requests, time
+
+from fastapi import FastAPI, BackgroundTasks
 from pydantic import BaseModel
+from fastapi.middleware.cors import CORSMiddleware # Colab Local Test 환경
 
 from sllm import sLLM
 
 app = FastAPI()
 sLLM = sLLM()
+
+# Colab Local Test 환경
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=['*'],
+    allow_credentials=True,
+    allow_methods=['*'],
+    allow_headers=['*'],
+)
 
 dotenv.load_dotenv()
 

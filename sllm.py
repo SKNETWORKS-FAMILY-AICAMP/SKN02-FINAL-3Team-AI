@@ -49,9 +49,26 @@ class sLLM:
 
         return prompt
     
-    def make_message(self, minutes):
+    def get_minutes(self, minutes:dict):
+        minutes_arr = minutes.get('minutes')
+        new_minutes = []
+
+        for line in minutes_arr:
+            speaker = line.get("speaker").strip()
+            text = line.get("text").strip()
+            content = f"{speaker}: {text}"
+
+            new_minutes.append(content)
+        
+        minutes_str = '\n'.join(new_minutes)
+        return minutes_str
+
+    
+    def make_message(self, minutes:dict):
 
         prompt = self.get_prompt()
+        minutes = self.get_minutes(minutes)
+
         messages = [
             {"role": "system", "content": prompt},
             {"role": "user", "content": minutes},
