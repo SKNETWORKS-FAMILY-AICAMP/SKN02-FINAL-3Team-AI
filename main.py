@@ -89,13 +89,14 @@ def make_minutes(meeting_id: int, audio_url: str, num_of_person: int, b_task:Bac
     print("===============================================")
     time.sleep(2)
     pipeline = STT(
-        input_audio_url='s3://meetingbridge/record/45.wav',
-        num_speakers=5,  # num_of_person 값을 num_speakers로 전달
+        input_audio_url= audio_url,
+        num_speakers=num_of_person,  # num_of_person 값을 num_speakers로 전달
         device='cuda' if torch.cuda.is_available() else 'cpu',
     )
 
     # STT 실행 및 결과 받기
     content=pipeline.run()
+    
     send_minutes(meeting_id, content, b_task)
 
 def make_summary(meeting_id: int, content: dict):

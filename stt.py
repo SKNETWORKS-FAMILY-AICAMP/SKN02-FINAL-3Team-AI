@@ -19,6 +19,7 @@ class STT:
         self.diarization_pipeline = self.load_diarization_pipeline()
         self.whisper_model = self.load_whisper_model()
         self.align_model, self.metadata = self.load_align_model()
+        self.merge_speaker = self.merge_speaker_texts
 
     def load_whisper_model(self):
         print("위스퍼_모델_로딩중")
@@ -215,6 +216,28 @@ class STT:
             return None
 
         return aligned_segments
+    
+    def merge_speaker_texts(json_content):
+        merged_minutes = []
+        current_speaker = None
+        current_text = ""
+
+        for entry in json_content:
+            if entry["speaker"] == current_speaker:
+                # 같은 화자의 경우 텍스트를 이어 붙임
+                current_text += " " + entry["text"]
+            else:
+                # 화자가 바뀌는 경우 이전 화자를 저장하고 새 화자로 갱신
+                if current_speaker is not None:
+                    merged_minutes.append({"speaker": current_speaker, "text": current_text.strip()})
+                current_speaker = entry["speaker"]
+                current_text = entry["text"]
+
+        # 마지막 화자에 대한 정보 추가
+        if current_speaker is not None:
+            merged_minutes.append({"speaker": current_speaker, "text": current_text.strip()})
+
+        return merged_minutes
 
     def run(self):
         audio_data = self.download_audio()
@@ -251,6 +274,11 @@ class STT:
                 all_aligned_segments.extend(chunk_segments)
 
         matched_segments = self.match_speaker_to_segments(diarization, all_aligned_segments)
-        content = self.save_transcriptions_as_json(matched_segments)
+        json_content = self.save_transcriptions_as_json(matched_segments)
+        if json_content is None:
+            print("json_content_생성_실패")
+            return
+        
+        content = {"minutes": self.merge_speaker_texts(json_content["minutes"])}
         print("STT완료")
         return content
