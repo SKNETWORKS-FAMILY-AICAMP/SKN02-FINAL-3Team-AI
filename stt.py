@@ -9,8 +9,6 @@ import requests
 from io import BytesIO
 import soundfile as sf
 
-import boto3
-
 class STT:
     def __init__(self,input_audio_url,num_speakers, device):
         self.input_audio_url = input_audio_url
@@ -42,18 +40,9 @@ class STT:
 
     def download_audio_to_memory(self):
         try:
-            session = boto3.Session(
-                      aws_access_key_id=os.environ['AWS_ACCESS_KEY_ID'],
-                      aws_secret_access_key=os.environ['AWS_SECRET_ACCESS_KEY'],
-                      region_name=['AWS_S3_REGION_NAME']
-                      )
-            s3 = session.resource('s3')
-            obj = s3.Object(os.environ['AWS_STORAGE_BUCKET_NAME'], self.input_audio_url)
-            response = obj.get()
-            # response = requests.get(self.input_audio_url, stream=False)
-            # response.raise_for_status()  # HTTP 요청이 성공적으로 완료되지 않을 경우 예외 발생
-            audio_data = BytesIO(response['Body'])
-            
+            response = requests.get(self.input_audio_url, stream=False)
+            response.raise_for_status()  # HTTP 요청이 성공적으로 완료되지 않을 경우 예외 발생
+            audio_data = BytesIO(response.content)
             print(type(audio_data))
             return audio_data
         except requests.exceptions.RequestException as e:
