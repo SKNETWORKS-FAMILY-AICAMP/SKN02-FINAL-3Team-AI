@@ -7,6 +7,8 @@ from fastapi.middleware.cors import CORSMiddleware # Colab Local Test 환경
 
 from sllm import sLLM
 
+dotenv.load_dotenv()
+
 app = FastAPI()
 sLLM = sLLM()
 
@@ -18,8 +20,6 @@ app.add_middleware(
     allow_methods=['*'],
     allow_headers=['*'],
 )
-
-dotenv.load_dotenv()
 
 api_key = os.environ['api_key']
 web_url = os.environ['web_url']
