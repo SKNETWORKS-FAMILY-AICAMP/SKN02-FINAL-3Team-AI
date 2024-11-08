@@ -11,6 +11,8 @@ COPY . /src
 WORKDIR /src
 
 RUN pip install -r requirements.txt
+RUN pip install -U bitsandbytes
+RUN pip install -U transformers
 
 EXPOSE 8000
 
