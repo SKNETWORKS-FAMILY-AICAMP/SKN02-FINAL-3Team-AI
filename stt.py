@@ -43,7 +43,6 @@ class STT:
             
             # Convert the content to an AudioSegment
             audio = AudioSegment.from_file(io.BytesIO(response.content))
-            print(response.content)
             
             buffer = io.BytesIO()
             audio.export(buffer, format="wav")
@@ -68,7 +67,7 @@ class STT:
 
         return buffer
 
-    def perform_vad_on_full_audio(self,audio):
+    def perform_vad_on_full_audio(self, audio):
         print("VAD처리중")
         audio = AudioSegment.from_wav(audio)
         samples = np.array(audio.get_array_of_samples()).astype(np.float32)
@@ -172,7 +171,7 @@ class STT:
             else:
                 audio_array = audio_array.reshape(1, -1)
 
-            diarization = self.diarization_pipeline({"waveform": torch.from_numpy(audio_array), "sample_rate": vad_audio.frame_rate}, num_speakers=num_speakers)
+            diarization = self.diarization_pipeline({"waveform": torch.from_numpy(audio_array), "sample_rate": vad_audio.frame_rate}, max_speakers=num_speakers)
             print("화자분리_완료")
             return diarization
         except Exception as e:
@@ -254,7 +253,7 @@ class STT:
 
     def run(self, input_audio_url, num_speakers):
         download_audio = self.download_audio_to_memory(input_audio_url)
-        if audio_data is None:
+        if download_audio is None:
             print("오디오_다운로드_실패")
             return None
         

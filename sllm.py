@@ -83,7 +83,7 @@ class SLLM:
         
         return message
     
-    def make_format(response: str):
+    def make_format(self, response: str):
         start_idx = response.find('1.')
         return response[start_idx:]
 

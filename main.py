@@ -42,8 +42,11 @@ def send_minutes(meeting_id: int, content: dict, b_task:BackgroundTasks):
         "content": content
     }
     
-    response = requests.patch(os.path.join(web_url, 'meeting/detail'), json=params)
-    print("send_minutes ==> ", response.status_code)
+    url = os.path.join(web_url, 'meeting/detail')
+    print(f'send_minutes URL ---> {url}')
+
+    response = requests.patch(url, json=params)
+    print(f"send_minutes RESULT ---> {response.status_code}")
 
     generate_summary(meeting_id, content, b_task)
 
@@ -53,9 +56,11 @@ def send_summary(meeting_id: int, summary: str):
         "meeting_id": meeting_id,
         "summary": summary
     }
-
-    response = requests.patch(os.path.join(web_url, 'meeting/summary'), json=params)
-    print("send_minutes ==> ", response.status_code)
+    url = os.path.join(web_url, 'meeting/summary')
+    print(f'send_summary URL ---> {url}')
+    
+    response = requests.patch(url, json=params)
+    print(f"send_summary RESULT ---> {response.status_code}")
 
 @app.post("/generate_minutes/")
 async def generate_minutes(from_django: FromDjango, b_task:BackgroundTasks):
