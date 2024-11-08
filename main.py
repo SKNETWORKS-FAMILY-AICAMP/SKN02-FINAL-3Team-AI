@@ -13,7 +13,6 @@ dotenv.load_dotenv()
 
 app = FastAPI()
 sLLM = sLLM()
-STT = STT()
 
 # Colab Local Test 환경
 app.add_middleware(

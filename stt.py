@@ -6,15 +6,17 @@ from pyannote.audio import Pipeline
 import torch
 import numpy as np
 import requests
+import io
 from io import BytesIO
 import soundfile as sf
+import librosa
 
 class STT:
     def __init__(self,input_audio_url,num_speakers, device):
         self.input_audio_url = input_audio_url
         self.num_speakers = num_speakers
         self.device = torch.device(device) if not isinstance(device, torch.device) else device
-        self.download_audio = self.download_audio_to_memory()
+        self.fetch_audio_from_url = self.download_audio_to_memory
         self.vad_pipeline = self.load_vad_pipeline()
         self.diarization_pipeline = self.load_diarization_pipeline()
         self.whisper_model = self.load_whisper_model()
@@ -41,19 +43,35 @@ class STT:
     def download_audio_to_memory(self):
         try:
             response = requests.get(self.input_audio_url, stream=False)
-            response.raise_for_status()  # HTTP 요청이 성공적으로 완료되지 않을 경우 예외 발생
-            audio_data = BytesIO(response.content)
-            print(type(audio_data))
-            return audio_data
+            response.raise_for_status()
+            
+            # Convert the content to an AudioSegment
+            audio = AudioSegment.from_file(io.BytesIO(response.content))
+            print(response.content)
+            
+            buffer = io.BytesIO()
+            audio.export(buffer, format="wav")
+            
+            return buffer.getvalue()
+        
         except requests.exceptions.RequestException as e:
-            print(f"오디오 다운로드 실패: {e}")
-            return None
+            raise Exception(f"URL이 맞지 않습니다.: {str(e)}")
+        except Exception as e:
+            raise Exception(f"오디오가 변환되지 않았습니다.: {str(e)}")
 
-    def fixed_audio(audio):
-        temp_audio = 'temp.wav'
-        x, _ = librosa.load(audio, sr=16000)
-        sf.write(temp_audio, x, 16000)
-        return temp_audio
+    def fixed_audio(self, audio):
+        audio_file = io.BytesIO(audio)
+
+        x, _ = librosa.load(audio_file, sr=16000)
+
+        buffer = io.BytesIO()
+        sf.write(buffer, x, 16000, format='WAV')
+
+        # `pydub.AudioSegment`를 사용하기 전에 버퍼의 파일 포인터를 처음으로 되돌립니다.
+        buffer.seek(0)
+
+        # Return bytes representation of the audio, or buffer object for further processing
+        return buffer
 
     def perform_vad_on_full_audio(self,audio):
         print("VAD처리중")
@@ -217,7 +235,7 @@ class STT:
 
         return aligned_segments
     
-    def merge_speaker_texts(json_content):
+    def merge_speaker_texts(self, json_content):
         merged_minutes = []
         current_speaker = None
         current_text = ""
@@ -240,25 +258,25 @@ class STT:
         return merged_minutes
 
     def run(self):
-        audio_data = self.download_audio()
+        download_audio = self.fetch_audio_from_url()
         if audio_data is None:
             print("오디오_다운로드_실패")
-            return
+            return None
         
-        audio_data = self.fixed_audio(audio_data)
+        audio_data = self.fixed_audio(download_audio)
         if audio_data is None:
            print("오디오_파일_정상화_실패")
-           return
+           return None
 
         vad_audio = self.perform_vad_on_full_audio(audio_data)
         if vad_audio is None:
             print("VAD처리_오류")
-            return
+            return None
 
         diarization = self.perform_diarization(vad_audio)
         if diarization is None:
             print("화자분리_실패")
-            return
+            return None
 
         chunks = self.split_audio(vad_audio)
 
