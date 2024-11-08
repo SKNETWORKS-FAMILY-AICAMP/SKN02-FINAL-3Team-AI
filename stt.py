@@ -13,7 +13,7 @@ import librosa
 
 class STT:
     def __init__(self):
-        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu') if not isinstance('cuda' if torch.cuda.is_available() else 'cpu', torch.device) else 'cuda' if torch.cuda.is_available() else 'cpu'
         self.whisper_model = self.load_whisper_model()
         self.align_model, self.metadata = self.load_align_model()
         self.vad_pipeline = self.load_vad_pipeline()
@@ -63,10 +63,9 @@ class STT:
         buffer = io.BytesIO()
         sf.write(buffer, x, 16000, format='WAV')
 
-        # `pydub.AudioSegment`를 사용하기 전에 버퍼의 파일 포인터를 처음으로 되돌립니다.
+        # `pydub.AudioSegment`를 사용하기 전에 버퍼의 파일 포인터를 처음으로 되돌리기(오디오를 처음부터 읽어야 하기 때문)
         buffer.seek(0)
 
-        # Return bytes representation of the audio, or buffer object for further processing
         return buffer
 
     def perform_vad_on_full_audio(self,audio):
