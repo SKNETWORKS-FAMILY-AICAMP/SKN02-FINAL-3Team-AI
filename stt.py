@@ -12,16 +12,12 @@ import soundfile as sf
 import librosa
 
 class STT:
-    def __init__(self,input_audio_url,num_speakers, device):
-        self.input_audio_url = input_audio_url
-        self.num_speakers = num_speakers
-        self.device = torch.device(device) if not isinstance(device, torch.device) else device
-        self.fetch_audio_from_url = self.download_audio_to_memory
-        self.vad_pipeline = self.load_vad_pipeline()
-        self.diarization_pipeline = self.load_diarization_pipeline()
+    def __init__(self):
+        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         self.whisper_model = self.load_whisper_model()
         self.align_model, self.metadata = self.load_align_model()
-        self.merge_speaker = self.merge_speaker_texts
+        self.vad_pipeline = self.load_vad_pipeline()
+        self.diarization_pipeline = self.load_diarization_pipeline()
 
     def load_whisper_model(self):
         print("위스퍼_모델_로딩중")
@@ -40,9 +36,9 @@ class STT:
         pipeline = Pipeline.from_pretrained("pyannote/speaker-diarization-3.1")
         return pipeline.to(torch.device(self.device))
 
-    def download_audio_to_memory(self):
+    def download_audio_to_memory(self, input_audio_url):
         try:
-            response = requests.get(self.input_audio_url, stream=False)
+            response = requests.get(input_audio_url, stream=False)
             response.raise_for_status()
             
             # Convert the content to an AudioSegment
@@ -167,7 +163,7 @@ class STT:
             print(f"후처리_에러: {e}")
             return None
 
-    def perform_diarization(self, vad_audio):
+    def perform_diarization(self, vad_audio, num_speakers):
         print("화자_분리")
         try:
             audio_array = np.array(vad_audio.get_array_of_samples()).astype(np.float32) / 32768.0
@@ -177,7 +173,7 @@ class STT:
             else:
                 audio_array = audio_array.reshape(1, -1)
 
-            diarization = self.diarization_pipeline({"waveform": torch.from_numpy(audio_array), "sample_rate": vad_audio.frame_rate}, num_speakers=self.num_speakers)
+            diarization = self.diarization_pipeline({"waveform": torch.from_numpy(audio_array), "sample_rate": vad_audio.frame_rate}, num_speakers=num_speakers)
             print("화자분리_완료")
             return diarization
         except Exception as e:
@@ -257,8 +253,8 @@ class STT:
 
         return merged_minutes
 
-    def run(self):
-        download_audio = self.fetch_audio_from_url()
+    def run(self, input_audio_url, num_speakers):
+        download_audio = self.download_audio_to_memory(input_audio_url)
         if audio_data is None:
             print("오디오_다운로드_실패")
             return None
@@ -273,7 +269,7 @@ class STT:
             print("VAD처리_오류")
             return None
 
-        diarization = self.perform_diarization(vad_audio)
+        diarization = self.perform_diarization(vad_audio, num_speakers)
         if diarization is None:
             print("화자분리_실패")
             return None

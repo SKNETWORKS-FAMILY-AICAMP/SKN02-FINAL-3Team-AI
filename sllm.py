@@ -1,7 +1,7 @@
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig, pipeline
 
-class sLLM:
+class SLLM:
     def __init__(self):
         self.bnb_config = BitsAndBytesConfig(
             load_in_4bit=True, # 모델을 4비트 정밀도로 로드

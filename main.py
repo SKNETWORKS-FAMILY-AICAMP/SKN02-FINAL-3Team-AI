@@ -1,18 +1,17 @@
-import uvicorn
-import dotenv, os, requests, time
-import torch
+import dotenv, os, requests
 
 from fastapi import FastAPI, BackgroundTasks
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware # Colab Local Test 환경
 
 from stt import STT
-from sllm import sLLM
+from sllm import SLLM
 
 dotenv.load_dotenv()
 
 app = FastAPI()
-sLLM = sLLM()
+sLLM = SLLM()
+stt = STT()
 
 # Colab Local Test 환경
 app.add_middleware(
@@ -86,15 +85,9 @@ def make_minutes(meeting_id: int, audio_url: str, num_of_person: int, b_task:Bac
     print("===============================================")
     print("make_minutes")
     print("===============================================")
-    time.sleep(2)
-    pipeline = STT(
-        input_audio_url= audio_url,
-        num_speakers=num_of_person,  # num_of_person 값을 num_speakers로 전달
-        device='cuda' if torch.cuda.is_available() else 'cpu',
-    )
 
     # STT 실행 및 결과 받기
-    content=pipeline.run()
+    content=stt.run(audio_url, num_of_person)
     
     send_minutes(meeting_id, content, b_task)
 
@@ -103,6 +96,3 @@ def make_summary(meeting_id: int, content: dict):
     summary = sLLM.sllm_response(content)
 
     send_summary(meeting_id, summary)
-
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
