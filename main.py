@@ -1,4 +1,4 @@
-import dotenv, os, requests
+import dotenv, os, requests, uvicorn
 
 from fastapi import FastAPI, BackgroundTasks
 from pydantic import BaseModel
@@ -63,7 +63,7 @@ def send_summary(meeting_id: int, summary: str):
     print(f"send_summary RESULT ---> {response.status_code}")
 
 @app.post("/generate_minutes/")
-async def generate_minutes(from_django: FromDjango, b_task:BackgroundTasks):
+def generate_minutes(from_django: FromDjango, b_task:BackgroundTasks):
     print("===============================================")
     print("process starts! ========>")
     print("===============================================")
@@ -101,3 +101,6 @@ def make_summary(meeting_id: int, content: dict):
     summary = sLLM.sllm_response(content)
 
     send_summary(meeting_id, summary)
+
+if __name__ == "main":
+    uvicorn.run(app, host="0.0.0.0", port=8000)
