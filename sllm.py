@@ -1,7 +1,7 @@
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig, pipeline
 
-class sLLM:
+class SLLM:
     def __init__(self):
         self.bnb_config = BitsAndBytesConfig(
             load_in_4bit=True, # 모델을 4비트 정밀도로 로드
@@ -24,20 +24,22 @@ class sLLM:
         prompt = """아래 지시사항에 따라 사용자가 입력하는 회의록을 요약하십시오.
 
         회의록의 **주요 논의 주제**를 포괄적으로 요약하십시오.
-        요약은 아래와 같은 트리구조로 작성하십시오.
+        요약은 아래와 같은 트리구조의 Markdown 문법으로 작성하십시오.
+
         1. **회의 주제**: [주제]
         2. **회의 요약**:
-        - [요약 1]
-        - [요약 2]
-        - [요약 3]
-        ...
+            - [요약 1]
+            - [요약 2]
+            - [요약 3]
+            ...
         3. **회의 결론**: [결론]
 
-        - 반드시 문어체를 사용하십시오.
+        <지시사항>
+        - 반드시 문어체를 사용하여 보고서의 형식으로 작성하십시오.
         - 요약문은 한국어로 작성하십시오.
         - 회의록에 없는 내용은 입력하지 마십시오.
+        - 회의의 주요 내용을 **회의 요약**에 모두 포함하십시오.
         - 모든 논의된 주제를 빠짐없이 포함하십시오.
-        - 회의의 주요 내용을 회의 요약에 모두 포함하십시오.
         - 가능하면 논의된 각 주제의 맥락을 충분히 설명하십시오.
         - 여러 팀이 참여한 경우, 팀별로 나누어 요약을 작성하십시오.
         - 다음 회의 날짜가 명시된 경우에만 다음 회의 일정을 별도로 표시하십시오.
@@ -83,8 +85,8 @@ class sLLM:
         
         return message
     
-    def make_format(response: str):
-        start_idx = response.find('1.')
+    def make_format(self, response: str):
+        start_idx = response.find('1.')            
         return response[start_idx:]
 
     def sllm_response(self, minutes: dict):

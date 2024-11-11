@@ -12,16 +12,12 @@ import soundfile as sf
 import librosa
 
 class STT:
-    def __init__(self,input_audio_url,num_speakers, device):
-        self.input_audio_url = input_audio_url
-        self.num_speakers = num_speakers
-        self.device = torch.device(device) if not isinstance(device, torch.device) else device
-        self.fetch_audio_from_url = self.download_audio_to_memory
-        self.vad_pipeline = self.load_vad_pipeline()
-        self.diarization_pipeline = self.load_diarization_pipeline()
+    def __init__(self):
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu') if not isinstance('cuda' if torch.cuda.is_available() else 'cpu', torch.device) else 'cuda' if torch.cuda.is_available() else 'cpu'
         self.whisper_model = self.load_whisper_model()
         self.align_model, self.metadata = self.load_align_model()
-        self.merge_speaker = self.merge_speaker_texts
+        self.vad_pipeline = self.load_vad_pipeline()
+        self.diarization_pipeline = self.load_diarization_pipeline()
 
     def load_whisper_model(self):
         print("위스퍼_모델_로딩중")
@@ -40,44 +36,38 @@ class STT:
         pipeline = Pipeline.from_pretrained("pyannote/speaker-diarization-3.1")
         return pipeline.to(torch.device(self.device))
 
-    def download_audio_to_memory(self):
+    def download_audio_to_memory(self, input_audio_url):
         try:
-            response = requests.get(self.input_audio_url)
+            response = requests.get(input_audio_url, stream=False)
             response.raise_for_status()
             
             # Convert the content to an AudioSegment
             audio = AudioSegment.from_file(io.BytesIO(response.content))
             
-            # Convert to WAV format in memory
             buffer = io.BytesIO()
             audio.export(buffer, format="wav")
             
             return buffer.getvalue()
         
         except requests.exceptions.RequestException as e:
-            raise Exception(f"Failed to download audio from URL: {str(e)}")
+            raise Exception(f"URL이 맞지 않습니다.: {str(e)}")
         except Exception as e:
-            raise Exception(f"Error processing audio: {str(e)}")
+            raise Exception(f"오디오가 변환되지 않았습니다.: {str(e)}")
 
-    
     def fixed_audio(self, audio):
-        # Assuming audio is in bytes, use BytesIO to handle it as a file-like object
         audio_file = io.BytesIO(audio)
 
-        # Load the audio from memory
         x, _ = librosa.load(audio_file, sr=16000)
 
-        # Save to a BytesIO object instead of a file on disk
         buffer = io.BytesIO()
         sf.write(buffer, x, 16000, format='WAV')
 
-        # `pydub.AudioSegment`를 사용하기 전에 버퍼의 파일 포인터를 처음으로 되돌립니다.
+        # `pydub.AudioSegment`를 사용하기 전에 버퍼의 파일 포인터를 처음으로 되돌리기(오디오를 처음부터 읽어야 하기 때문)
         buffer.seek(0)
 
-        # Return the BytesIO buffer (file-like object)
         return buffer
-  
-    def perform_vad_on_full_audio(self,audio):
+
+    def perform_vad_on_full_audio(self, audio):
         print("VAD처리중")
         audio = AudioSegment.from_wav(audio)
         samples = np.array(audio.get_array_of_samples()).astype(np.float32)
@@ -149,7 +139,13 @@ class STT:
         print("전사_처리")
         try:
             audio_array = np.array(audio_segment.get_array_of_samples()).astype(np.float32) / 32768.0
-            segments, _ = self.whisper_model.transcribe(audio_array,beam_size=5)
+            segments, _ = self.whisper_model.transcribe(audio_array,
+            beam_size=5,  # beam_size 조정
+            temperature=0.3,  # temperature 조정
+            condition_on_previous_text=True,  # 이전 텍스트에 대한 조건 설정
+            vad_filter=True,
+            vad_parameters=dict(min_silence_duration_ms=200,)
+            )
             segments=list(segments)
             print("전사_처리_완료")
             transcription_segments = [{"start": seg.start, "end": seg.end, "text": seg.text} for seg in segments]
@@ -171,7 +167,7 @@ class STT:
             print(f"후처리_에러: {e}")
             return None
 
-    def perform_diarization(self, vad_audio):
+    def perform_diarization(self, vad_audio, num_speakers):
         print("화자_분리")
         try:
             audio_array = np.array(vad_audio.get_array_of_samples()).astype(np.float32) / 32768.0
@@ -181,7 +177,7 @@ class STT:
             else:
                 audio_array = audio_array.reshape(1, -1)
 
-            diarization = self.diarization_pipeline({"waveform": torch.from_numpy(audio_array), "sample_rate": vad_audio.frame_rate}, num_speakers=self.num_speakers)
+            diarization = self.diarization_pipeline({"waveform": torch.from_numpy(audio_array), "sample_rate": vad_audio.frame_rate}, max_speakers=num_speakers)
             print("화자분리_완료")
             return diarization
         except Exception as e:
@@ -239,7 +235,7 @@ class STT:
 
         return aligned_segments
     
-    def merge_speaker_texts(self,json_content):
+    def merge_speaker_texts(self, json_content):
         merged_minutes = []
         current_speaker = None
         current_text = ""
@@ -261,24 +257,26 @@ class STT:
 
         return merged_minutes
 
-    def run(self):
-        downloaded_audio = self.fetch_audio_from_url()
-        if downloaded_audio is None:
-            print("Audio download failed.")
+    def run(self, input_audio_url, num_speakers):
+        download_audio = self.download_audio_to_memory(input_audio_url)
+        if download_audio is None:
+            print("오디오_다운로드_실패")
             return None
         
-        temp_audio = self.fixed_audio(downloaded_audio)
-        print(f"Temporary audio saved at: {temp_audio}")
+        audio_data = self.fixed_audio(download_audio)
+        if audio_data is None:
+           print("오디오_파일_정상화_실패")
+           return None
 
-        vad_audio = self.perform_vad_on_full_audio(temp_audio)
+        vad_audio = self.perform_vad_on_full_audio(audio_data)
         if vad_audio is None:
             print("VAD처리_오류")
-            return
+            return None
 
-        diarization = self.perform_diarization(vad_audio)
+        diarization = self.perform_diarization(vad_audio, num_speakers)
         if diarization is None:
             print("화자분리_실패")
-            return
+            return None
 
         chunks = self.split_audio(vad_audio)
 
@@ -299,8 +297,6 @@ class STT:
             print("json_content_생성_실패")
             return
         
-        content = {
-            "minutes": self.merge_speaker_texts(json_content["minutes"])
-                 }
+        content = {"minutes": self.merge_speaker_texts(json_content["minutes"])}
         print("STT완료")
         return content
