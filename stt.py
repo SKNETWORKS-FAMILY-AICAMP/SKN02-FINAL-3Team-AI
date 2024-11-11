@@ -100,7 +100,7 @@ class STT:
 
         return speech_audio
 
-    def split_audio(self, audio, chunk_duration=600000):
+    def split_audio(self, audio, chunk_duration=120000):
         print("10단위로_나누는_중")
         duration = len(audio)
         chunks = [audio[i:i + chunk_duration] for i in range(0, duration, chunk_duration)]
