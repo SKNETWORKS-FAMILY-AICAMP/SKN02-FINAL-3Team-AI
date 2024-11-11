@@ -25,25 +25,17 @@ class SLLM:
 
         회의록의 **주요 논의 주제**를 포괄적으로 요약하십시오.
         요약은 아래와 같은 트리구조의 Markdown 문법으로 작성하십시오.
-<<<<<<< HEAD
 
-        <구조>
-=======
->>>>>>> f308fbe784bfddda969063ce5dc3b4f1acaffa09
         1. **회의 주제**: [주제]
         2. **회의 요약**:
             - [요약 1]
             - [요약 2]
             - [요약 3]
-<<<<<<< HEAD
             ...
-=======
-        ...
->>>>>>> f308fbe784bfddda969063ce5dc3b4f1acaffa09
         3. **회의 결론**: [결론]
 
         <지시사항>
-        - 반드시 문어체를 사용하십시오.
+        - 반드시 문어체를 사용하여 보고서의 형식으로 작성하십시오.
         - 요약문은 한국어로 작성하십시오.
         - 회의록에 없는 내용은 입력하지 마십시오.
         - 회의의 주요 내용을 **회의 요약**에 모두 포함하십시오.
@@ -94,14 +86,8 @@ class SLLM:
         return message
     
     def make_format(self, response: str):
-        start_idx = response.find('1.')
-
-        if start_idx < 1:
-            split_idx == 0
-        else:
-            split_idx = start_idx - 1
-            
-        return response[split_idx:]
+        start_idx = response.find('1.')            
+        return response[start_idx:]
 
     def sllm_response(self, minutes: dict):
         # 텍스트 생성을 위한 파이프라인 설정
