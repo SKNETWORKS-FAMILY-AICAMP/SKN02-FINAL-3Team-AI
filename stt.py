@@ -176,6 +176,7 @@ class STT:
                 if turn.start <=midpoint <= turn.end:
                     matched_segments.append((segment['start'], segment['end'], speaker, segment['text']))
                     speaker_found =True
+                    logger.debug(matched_segments)
                     break
                 if not speaker_found:
                     matched_segments.append((segment['start'], segment['end'], "Unknown", segment['text']))
@@ -278,4 +279,5 @@ class STT:
         
         content = {"minutes": self.merge_speaker_texts(json_content["minutes"])}
         logger.debug("STT완료")
+        logger.debug(content)
         return content
