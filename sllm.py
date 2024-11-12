@@ -87,9 +87,9 @@ class SLLM:
         
         return message
     
-    def make_format(self, response: str):
-        start_idx = response.find('1.')            
-        return response[start_idx:]
+    # def make_format(self, response: str):
+    #     start_idx = response.find('1.')            
+    #     return response[start_idx:]
 
     def sllm_response(self, minutes: dict):
         # 텍스트 생성을 위한 파이프라인 설정
@@ -108,7 +108,8 @@ class SLLM:
                 eos_token_id=self.tokenizer.eos_token_id
             )
 
-            response = self.make_format(outputs[0]["generated_text"][len(message):])
+            # response = self.make_format(outputs[0]["generated_text"][len(message):])
+            response = outputs[0]["generated_text"][len(message):]
         except Exception as e:
             print(e)
             response = "요약문 생성에 실패했습니다."
