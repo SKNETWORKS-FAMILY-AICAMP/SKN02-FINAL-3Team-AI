@@ -82,19 +82,21 @@ class SLLM:
         prompt = self.get_prompt()
         minutes = self.get_minutes(minutes)
 
-        messages = [
-            {"role": "system", "content": prompt},
-            {"role": "user", "content": minutes},
-        ]
+        message = f"### system:\n{prompt}" + self.tokenizer.eos_token + f"\n\n### user:\n{minutes}" + self.tokenizer.eos_token + f"\n\n### assistant:\n"
+        tokenized_message = self.tokenizer(message, return_tensors="pt", truncation=True, max_length=self.model_max_length)
+        # messages = [
+        #     {"role": "system", "content": prompt},
+        #     {"role": "user", "content": minutes},
+        # ]
 
-        message = self.tokenizer.apply_chat_template(
-            messages,
-            tokenize=True,
-            add_generation_prompt=True,
-            return_tensors="pt"
-        )
+        # message = self.tokenizer.apply_chat_template(
+        #     messages,
+        #     tokenize=True,
+        #     add_generation_prompt=True,
+        #     return_tensors="pt"
+        # )
         
-        return message
+        return tokenized_message
     
     # def make_format(self, response: str):
     #     start_idx = response.find('1.')            
@@ -106,7 +108,8 @@ class SLLM:
 
         try:
             outputs = self.model.generate(
-                message,
+                input_ids=message['input_ids'],
+                attention_mask=message['attention_mask'],
                 do_sample=True,
                 temperature=0.4,
                 top_k=5,
@@ -117,10 +120,14 @@ class SLLM:
                 eos_token_id=self.tokenizer.eos_token_id
             )
             response = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
-            
-            # message 입력의 길이 이후 부분만 추출
-            input_length = message['input_ids'].shape[1]  # message의 입력 길이
-            response = response[input_length:].strip()  # 입력 길이 이후 부분만 추출
+
+            assistant_marker = "### assistant:"
+            start_idx = response.find(assistant_marker)
+
+            if start_idx != -1:
+                response = response[start_idx + len(assistant_marker):].strip()
+            else:
+                response = response.strip()
 
             # outputs = self.pipe(
             #     message,
