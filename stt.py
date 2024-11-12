@@ -273,7 +273,7 @@ class STT:
         matched_segments = self.match_speaker_to_segments(diarization, all_aligned_segments)
         json_content = self.save_transcriptions_as_json(matched_segments)
         if json_content is None:
-            print("json_content_생성_실패")s
+            print("json_content_생성_실패")
             return
         
         content = {"minutes": self.merge_speaker_texts(json_content["minutes"])}
