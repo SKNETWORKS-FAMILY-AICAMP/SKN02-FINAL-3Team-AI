@@ -1,11 +1,13 @@
 import torch, logging
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig, pipeline
+from accelerate import Acclerator
 
 logger = logging.getLogger('uvicorn.error')
 logger.setLevel(logging.DEBUG)
 
 class SLLM:
     def __init__(self):
+        acc = Acclerator()
         self.bnb_config = BitsAndBytesConfig(
             load_in_4bit=True, # 모델을 4비트 정밀도로 로드
             bnb_4bit_quant_type="nf4", # 4비트 NormalFloat 양자화: 양자화된 파라미터의 분포 범위를 정규분포 내로 억제하여 정밀도 저하 방지
@@ -13,12 +15,13 @@ class SLLM:
             bnb_4bit_compute_dtype=torch.bfloat16 # 연산 속도를 높이기 위해 사용 (default: torch.float32)
         )
         self.model_path = './finetuned-qwen-v2'
-        self.model = AutoModelForCausalLM.from_pretrained(
+        model = AutoModelForCausalLM.from_pretrained(
             self.model_path,
             quantization_config=self.bnb_config,
             device_map="auto",
             torch_dtype=torch.bfloat16
         )
+        self.model = acc.prepare(model)
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_path)
         self.model_max_length = 128000
         self.pipe = pipeline("text-generation", device_map="auto", model=self.model, tokenizer=self.tokenizer, max_length=self.model_max_length)
