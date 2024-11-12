@@ -1,4 +1,4 @@
-import os
+import os, logging
 from pydub import AudioSegment
 from faster_whisper import WhisperModel
 import whisperx
@@ -11,6 +11,9 @@ from io import BytesIO
 import soundfile as sf
 import librosa
 
+logger = logging.getLogger('uvicorn.error')
+logger.setLevel(logging.DEBUG)
+
 class STT:
     def __init__(self):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu') if not isinstance('cuda' if torch.cuda.is_available() else 'cpu', torch.device) else 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -19,15 +22,15 @@ class STT:
         self.diarization_pipeline = self.load_diarization_pipeline()
 
     def load_whisper_model(self):
-        print("위스퍼_모델_로딩중")
+        logger.debug("위스퍼_모델_로딩중")
         return WhisperModel("deepdml/faster-whisper-large-v3-turbo-ct2", device='cuda', compute_type='int8')
 
     def load_vad_pipeline(self):
-        print("전처리_모델_로딩중")
+        logger.debug("전처리_모델_로딩중")
         return Pipeline.from_pretrained("pyannote/voice-activity-detection").to(self.device)
 
     def load_diarization_pipeline(self):
-        print("pyannote_로딩중")
+        logger.debug("pyannote_로딩중")
         pipeline = Pipeline.from_pretrained("pyannote/speaker-diarization-3.1")
         return pipeline.to(torch.device(self.device))
 
@@ -63,7 +66,7 @@ class STT:
         return buffer
 
     def perform_vad_on_full_audio(self, audio):
-        print("VAD처리중")
+        logger.debug("VAD처리중")
         audio = AudioSegment.from_wav(audio)
         samples = np.array(audio.get_array_of_samples()).astype(np.float32)
 
@@ -78,11 +81,11 @@ class STT:
         try:
             vad = self.vad_pipeline({"waveform": waveform, "sample_rate": audio.frame_rate})
         except Exception as e:
-            print(f"VAD_실패: {e}")
+            logger.debug(f"VAD_실패: {e}")
             return None
 
         speech_segments = vad.get_timeline().support()
-        print(f"{len(speech_segments)}개의 세그먼트")
+        logger.debug(f"{len(speech_segments)}개의 세그먼트")
 
         speech_audio = AudioSegment.empty()
         for segment in speech_segments:
@@ -96,14 +99,14 @@ class STT:
         return speech_audio
 
     def split_audio(self, audio, chunk_duration=600000):
-        print("10단위로_나누는_중")
+        logger.debug("10단위로_나누는_중")
         duration = len(audio)
         chunks = [audio[i:i + chunk_duration] for i in range(0, duration, chunk_duration)]
-        print(f"{len(chunks)} 청크_생성중")
+        logger.debug(f"{len(chunks)} 청크_생성중")
         return chunks
 
     def perform_vad_on_chunk(self, audio_chunk):
-        print("VAD_청로 나누기")
+        logger.debug("VAD_청로 나누기")
         samples = np.array(audio_chunk.get_array_of_samples()).astype(np.float32)
 
         if audio_chunk.channels == 2:
@@ -116,11 +119,11 @@ class STT:
         try:
             vad = self.vad_pipeline({"waveform": waveform, "sample_rate": audio_chunk.frame_rate})
         except Exception as e:
-            print(f"청크화_실패: {e}")
+            logger.debug(f"청크화_실패: {e}")
             return None
 
         speech_segments = vad.get_timeline().support()
-        print(f"{len(speech_segments)}_발화_인식한_세그먼트")
+        logger.debug(f"{len(speech_segments)}_발화_인식한_세그먼트")
 
         speech_audio = AudioSegment.empty()
         for segment in speech_segments:
@@ -131,22 +134,22 @@ class STT:
         return speech_audio
 
     def transcribe_audio(self, audio_segment):
-        print("전사_처리")
+        logger.debug("전사_처리")
         try:
             audio_array = np.array(audio_segment.get_array_of_samples()).astype(np.float32) / 32768.0
             segments, _ = self.whisper_model.transcribe(audio_array,beam_size=5)
             segments=list(segments)
-            print("전사_처리_완료")
+            logger.debug("전사_처리_완료")
             transcription_segments = [{"start": seg.start, "end": seg.end, "text": seg.text} for seg in segments]
-            print("==========텍스트로 변환==========")
-            print(transcription_segments)
+            logger.debug("==========텍스트로 변환==========")
+            logger.debug(transcription_segments)
             return transcription_segments
         except Exception as e:
-            print(f"전사_처리_실패: {e}")
+            logger.debug(f"전사_처리_실패: {e}")
             return None
 
     def perform_diarization(self, vad_audio, num_speakers):
-        print("화자_분리")
+        logger.debug("화자_분리")
         try:
             audio_array = np.array(vad_audio.get_array_of_samples()).astype(np.float32) / 32768.0
 
@@ -156,14 +159,14 @@ class STT:
                 audio_array = audio_array.reshape(1, -1)
 
             diarization = self.diarization_pipeline({"waveform": torch.from_numpy(audio_array), "sample_rate": vad_audio.frame_rate}, max_speakers=num_speakers)
-            print("화자분리_완료")
+            logger.debug("화자분리_완료")
             return diarization
         except Exception as e:
-            print(f"화자분리_실패: {e}")
+            logger.debug(f"화자분리_실패: {e}")
             return None
 
     def match_speaker_to_segments(self, diarization, transcription_segments):
-        print("화자_매칭중")
+        logger.debug("화자_매칭중")
         matched_segments=[]
 
         for segment in transcription_segments:
@@ -178,11 +181,11 @@ class STT:
                     matched_segments.append((segment['start'], segment['end'], "Unknown", segment['text']))
 
         matched_segments.sort(key=lambda x: x[0])
-        print("화자_매칭_완료")
+        logger.debug("화자_매칭_완료")
         return matched_segments
 
     def save_transcriptions_as_json(self, matched_segments):
-        print("json형태로_변환중")
+        logger.debug("json형태로_변환중")
         try:
             transcriptions = []
             for segment in matched_segments:
@@ -194,11 +197,11 @@ class STT:
             content={"minutes":transcriptions}
             return content
         except Exception as e:
-            print(f"json형태로_변환실패: {e}")
+            logger.debug(f"json형태로_변환실패: {e}")
             return None
 
     def process_chunk(self, chunk):
-        print("청크화_진행중")
+        logger.debug("청크화_진행중")
         vad_audio = self.perform_vad_on_chunk(chunk)
         if vad_audio is None:
             return None
@@ -234,29 +237,29 @@ class STT:
     def run(self, input_audio_url, num_speakers):
         download_audio = self.download_audio_to_memory(input_audio_url)
         if download_audio is None:
-            print("오디오_다운로드_실패")
+            logger.debug("오디오_다운로드_실패")
             return None
         
         audio_data = self.fixed_audio(download_audio)
         if audio_data is None:
-           print("오디오_파일_정상화_실패")
+           logger.debug("오디오_파일_정상화_실패")
            return None
 
         vad_audio = self.perform_vad_on_full_audio(audio_data)
         if vad_audio is None:
-            print("VAD처리_오류")
+            logger.debug("VAD처리_오류")
             return None
 
         diarization = self.perform_diarization(vad_audio, num_speakers)
         if diarization is None:
-            print("화자분리_실패")
+            logger.debug("화자분리_실패")
             return None
 
         chunks = self.split_audio(vad_audio)
 
         all_aligned_segments = []
         for i, chunk in enumerate(chunks):
-            print(f"청크_생성 {i + 1}/{len(chunks)}")
+            logger.debug(f"청크_생성 {i + 1}/{len(chunks)}")
             chunk_segments = self.process_chunk(chunk)
             if chunk_segments:
                 chunk_duration = len(chunk) / 1000
@@ -264,8 +267,8 @@ class STT:
                     seg['start'] += i * chunk_duration
                     seg['end'] += i * chunk_duration
                 all_aligned_segments.extend(chunk_segments)
-        print("========= all aligned segments ==============")
-        print(all_aligned_segments)
+        logger.debug("========= all aligned segments ==============")
+        logger.debug(all_aligned_segments)
        
         matched_segments = self.match_speaker_to_segments(diarization, all_aligned_segments)
         json_content = self.save_transcriptions_as_json(matched_segments)
@@ -274,5 +277,5 @@ class STT:
             return
         
         content = {"minutes": self.merge_speaker_texts(json_content["minutes"])}
-        print("STT완료")
+        logger.debug("STT완료")
         return content

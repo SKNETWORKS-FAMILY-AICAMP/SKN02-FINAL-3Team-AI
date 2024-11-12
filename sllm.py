@@ -1,5 +1,8 @@
-import torch
+import torch, logging
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig, pipeline
+
+logger = logging.getLogger('uvicorn.error')
+logger.setLevel(logging.DEBUG)
 
 class SLLM:
     def __init__(self):
@@ -37,6 +40,8 @@ class SLLM:
         <지시사항>
         - 반드시 문어체를 사용하여 보고서의 형식으로 작성하십시오.
         - 요약문은 한국어로 작성하십시오.
+        - **회의록 요약문만 출력하십시오.**
+        - 다른 인사말이나 추가적인 텍스트는 포함하지 마십시오. 요약문에 불필요한 정보나 질문을 덧붙이지 마십시오.
         - 회의록에 없는 내용은 입력하지 마십시오.
         - 회의의 주요 내용을 **회의 요약**에 모두 포함하십시오.
         - 모든 논의된 주제를 빠짐없이 포함하십시오.
@@ -49,6 +54,7 @@ class SLLM:
         **요약문은 반드시 한글로 작성하십시오.**
         **요약문에 한자와 중국어를 사용하지 마십시오**
         **요약문에 번역문을 제공하지 마십시오!**
+        **요약문 이외의 내용은 출력하지 마십시오.**
         """
 
         return prompt
@@ -111,6 +117,6 @@ class SLLM:
             # response = self.make_format(outputs[0]["generated_text"][len(message):])
             response = outputs[0]["generated_text"][len(message):]
         except Exception as e:
-            print(e)
+            logger.debug(e)
             response = "요약문 생성에 실패했습니다."
         return response
