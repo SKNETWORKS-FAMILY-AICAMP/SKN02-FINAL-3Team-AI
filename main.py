@@ -1,4 +1,4 @@
-import dotenv, os, requests, uvicorn
+import dotenv, os, requests, uvicorn, logging
 
 from fastapi import FastAPI, BackgroundTasks
 from pydantic import BaseModel
@@ -12,6 +12,9 @@ dotenv.load_dotenv()
 app = FastAPI()
 sLLM = SLLM()
 stt = STT()
+
+logger = logging.getLogger('uvicorn.error')
+logger.setLevel(logging.DEBUG)
 
 # Colab Local Test 환경
 app.add_middleware(
@@ -43,10 +46,10 @@ def send_minutes(meeting_id: int, content: dict, b_task:BackgroundTasks):
     }
     
     url = os.path.join(web_url, 'meeting/detail')
-    print(f'send_minutes URL ---> {url}')
+    logger.debug(f'send_minutes URL ---> {url}')
 
     response = requests.patch(url, json=params)
-    print(f"send_minutes RESULT ---> {response.status_code}")
+    logger.debug(f"send_minutes RESULT ---> {response.status_code}")
 
     generate_summary(meeting_id, content, b_task)
 
@@ -57,16 +60,16 @@ def send_summary(meeting_id: int, summary: str):
         "summary": summary
     }
     url = os.path.join(web_url, 'meeting/summary')
-    print(f'send_summary URL ---> {url}')
+    logger.debug(f'send_summary URL ---> {url}')
     
     response = requests.patch(url, json=params)
-    print(f"send_summary RESULT ---> {response.status_code}")
+    logger.debug(f"send_summary RESULT ---> {response.status_code}")
 
 @app.post("/generate_minutes/")
 def generate_minutes(from_django: FromDjango, b_task:BackgroundTasks):
-    print("===============================================")
-    print("process starts! ========>")
-    print("===============================================")
+    logger.debug("===============================================")
+    logger.debug("process starts! ========>")
+    logger.debug("===============================================")
     b_task.add_task(make_minutes, from_django.meeting_id, from_django.audio_url, from_django.num_of_person, b_task)
 
     response = {
@@ -77,7 +80,7 @@ def generate_minutes(from_django: FromDjango, b_task:BackgroundTasks):
 
 @app.post("/generate_summary/")
 def generate_summary(meeting_id, content, b_task:BackgroundTasks):
-    print("summary starts! ========> meeting_id:", meeting_id)
+    logger.debug("summary starts! ========> meeting_id:", meeting_id)
     b_task.add_task(make_summary, meeting_id, content)
 
     response = {
@@ -87,9 +90,9 @@ def generate_summary(meeting_id, content, b_task:BackgroundTasks):
     return response
 
 def make_minutes(meeting_id: int, audio_url: str, num_of_person: int, b_task:BackgroundTasks):
-    print("===============================================")
-    print("make_minutes")
-    print("===============================================")
+    logger.debug("===============================================")
+    logger.debug("make_minutes")
+    logger.debug("===============================================")
 
     # STT 실행 및 결과 받기
     content=stt.run(audio_url, num_of_person)
@@ -97,7 +100,10 @@ def make_minutes(meeting_id: int, audio_url: str, num_of_person: int, b_task:Bac
     send_minutes(meeting_id, content, b_task)
 
 def make_summary(meeting_id: int, content: dict):
-    print("make_summary")
+    logger.debug("make_summary")
     summary = sLLM.sllm_response(content)
 
     send_summary(meeting_id, summary)
+
+if __name__ == "__main__":
+    uvicorn.run("main:app", host="0.0.0.0", port=8000)

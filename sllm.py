@@ -1,5 +1,8 @@
-import torch
+import torch, logging
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig, pipeline
+
+logger = logging.getLogger('uvicorn.error')
+logger.setLevel(logging.DEBUG)
 
 class SLLM:
     def __init__(self):
@@ -114,6 +117,6 @@ class SLLM:
             # response = self.make_format(outputs[0]["generated_text"][len(message):])
             response = outputs[0]["generated_text"][len(message):]
         except Exception as e:
-            print(e)
+            logger.debug(e)
             response = "요약문 생성에 실패했습니다."
         return response
