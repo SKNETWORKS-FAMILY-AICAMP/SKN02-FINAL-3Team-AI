@@ -18,6 +18,7 @@ class STT:
     def __init__(self):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu') if not isinstance('cuda' if torch.cuda.is_available() else 'cpu', torch.device) else 'cuda' if torch.cuda.is_available() else 'cpu'
         self.whisper_model = self.load_whisper_model()
+        # self.align_model, self.metadata = self.load_align_model()
         self.vad_pipeline = self.load_vad_pipeline()
         self.diarization_pipeline = self.load_diarization_pipeline()
 
@@ -148,6 +149,20 @@ class STT:
             logger.debug(f"전사_처리_실패: {e}")
             return None
 
+    # def post_process_whisperx(self, transcription_segments, audio_segment):
+    #     print("WhisperX로_후처리_중")
+    #     try:
+    #         audio_array = np.array(audio_segment.get_array_of_samples()).astype(np.float32) / 32768.0
+    #         result_aligned = whisperx.align(transcription_segments, self.align_model, self.metadata, audio_array, device=self.device)
+    #         aligned_segments = result_aligned.get("segments", []) if isinstance(result_aligned, dict) else []
+    #         print(f"실제 음성 세그먼트 {len(aligned_segments)}")
+    #         print("==========whisperX=========")
+    #         print(aligned_segments)
+    #         return aligned_segments
+    #     except Exception as e:
+    #         print(f"후처리_에러: {e}")
+    #         return None
+
     def perform_diarization(self, vad_audio, num_speakers):
         logger.debug("화자_분리")
         try:
@@ -237,6 +252,9 @@ class STT:
             return None
 
         return transcription_segments
+        # aligned_segments = self.post_process_whisperx(transcription_segments, vad_audio)
+        # if aligned_segments is None:
+        #     return None
     
     def merge_speaker_texts(self, json_content):
         merged_minutes = []
