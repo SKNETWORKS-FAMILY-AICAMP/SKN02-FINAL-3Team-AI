@@ -108,7 +108,6 @@ class SLLM:
             outputs = self.model.generate(
                 message,
                 do_sample=True,
-                truncation=True,
                 temperature=0.4,
                 top_k=5,
                 top_p=0.8,
