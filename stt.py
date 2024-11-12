@@ -139,13 +139,7 @@ class STT:
         print("전사_처리")
         try:
             audio_array = np.array(audio_segment.get_array_of_samples()).astype(np.float32) / 32768.0
-            segments, _ = self.whisper_model.transcribe(audio_array,
-            beam_size=5,  # beam_size 조정
-            temperature=0.3,  # temperature 조정
-            condition_on_previous_text=True,  # 이전 텍스트에 대한 조건 설정
-            vad_filter=True,
-            vad_parameters=dict(min_silence_duration_ms=200,)
-            )
+            segments, _ = self.whisper_model.transcribe(audio_array,beam_size=5)
             segments=list(segments)
             print("전사_처리_완료")
             transcription_segments = [{"start": seg.start, "end": seg.end, "text": seg.text} for seg in segments]
