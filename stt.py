@@ -106,7 +106,7 @@ class STT:
         return chunks
 
     def perform_vad_on_chunk(self, audio_chunk):
-        logger.debug("VAD_청로 나누기")
+        logger.debug("VAD_청크 나누기")
         samples = np.array(audio_chunk.get_array_of_samples()).astype(np.float32)
 
         if audio_chunk.channels == 2:
@@ -165,23 +165,40 @@ class STT:
             logger.debug(f"화자분리_실패: {e}")
             return None
 
-    def match_speaker_to_segments(self, diarization, transcription_segments):
+    def match_speaker_to_segments(self, diarization, all_aligned_segments):
         logger.debug("화자_매칭중")
-        matched_segments=[]
+        matched_segments = []
 
-        for segment in transcription_segments:
-            midpoint = (segment['start'] + segment['end']) / 2
+        for text_seg in all_aligned_segments:
+            text_start = text_seg['start']
+            text_end = text_seg['end']
+        
+            # 텍스트 구간에 맞는 화자 찾기
             speaker_found = False
-            for turn, _, speaker in diarization.itertracks(yield_label=True):
-                if turn.start <=midpoint <= turn.end:
-                    matched_segments.append((segment['start'], segment['end'], speaker, segment['text']))
-                    speaker_found =True
-                    logger.debug(matched_segments)
-                    break
-                if not speaker_found:
-                    matched_segments.append((segment['start'], segment['end'], "Unknown", segment['text']))
+            for dia_seg in diarization.itertracks(yield_label=True):
+                dia_start = dia_seg[0].start
+                dia_end = dia_seg[0].end
+                speaker = dia_seg[2]
 
-        matched_segments.sort(key=lambda x: x[0])
+                # 텍스트 구간이 화자 구간과 겹치는지 확인
+                if text_start < dia_end and text_end > dia_start:
+                    matched_segments.append({
+                        'start': text_start,
+                        'end': text_end,
+                        'text': text_seg['text'],
+                        'speaker': speaker
+                    })
+                    speaker_found = True
+                    break
+
+            # 매칭되는 화자가 없을 경우 'unknown' 처리
+            if not speaker_found:
+                matched_segments.append({
+                    'start': text_start,
+                    'end': text_end,
+                    'text': text_seg['text'],
+                    'speaker': 'unknown'
+                })
         logger.debug("화자_매칭_완료")
         return matched_segments
 
@@ -190,12 +207,20 @@ class STT:
         try:
             transcriptions = []
             for segment in matched_segments:
-                start_time, end_time, speaker, text = segment
+                # segment는 딕셔너리 형태이므로, 딕셔너리 접근 방식을 사용해야 합니다.
+                start_time = segment['start']
+                end_time = segment['end']
+                speaker = segment['speaker']
+                text = segment['text']
+                
                 transcriptions.append({
                     "speaker": speaker,
                     "text": text
                 })
-            content={"minutes":transcriptions}
+            
+            content = {"minutes": transcriptions}
+            logger.debug("========content=======")
+            logger.debug(content)
             return content
         except Exception as e:
             logger.debug(f"json형태로_변환실패: {e}")
