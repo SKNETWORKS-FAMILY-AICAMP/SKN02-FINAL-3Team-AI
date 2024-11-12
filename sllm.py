@@ -1,13 +1,13 @@
 import torch, logging
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig, pipeline
-from accelerate import Acclerator
+from accelerate import Accelerator
 
 logger = logging.getLogger('uvicorn.error')
 logger.setLevel(logging.DEBUG)
 
 class SLLM:
     def __init__(self):
-        acc = Acclerator()
+        self.accelerator = Accelerator()
         self.bnb_config = BitsAndBytesConfig(
             load_in_4bit=True, # 모델을 4비트 정밀도로 로드
             bnb_4bit_quant_type="nf4", # 4비트 NormalFloat 양자화: 양자화된 파라미터의 분포 범위를 정규분포 내로 억제하여 정밀도 저하 방지
@@ -21,7 +21,7 @@ class SLLM:
             device_map="auto",
             torch_dtype=torch.bfloat16
         )
-        self.model = acc.prepare(model)
+        self.model = self.accelerator.prepare(model)
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_path)
         self.model_max_length = 128000
         self.pipe = pipeline("text-generation", device_map="auto", model=self.model, tokenizer=self.tokenizer, max_length=self.model_max_length)
@@ -30,7 +30,7 @@ class SLLM:
         prompt = """아래 지시사항에 따라 사용자가 입력하는 회의록을 요약하십시오.
 
         회의록의 **주요 논의 주제**를 포괄적으로 요약하십시오.
-        요약은 아래와 같은 트리구조의 Markdown 문법으로 작성하십시오.
+        요약은 아래와 같은 트리구조의 보고서 형식으로 작성하십시오.
 
         1. **회의 주제**: [주제]
         2. **회의 요약**:
@@ -89,7 +89,7 @@ class SLLM:
 
         message = self.tokenizer.apply_chat_template(
             messages,
-            tokenize=False,
+            tokenize=True,
             add_generation_prompt=True,
             return_tensors="pt"
         )
@@ -103,8 +103,9 @@ class SLLM:
     def sllm_response(self, minutes: dict):
         # 텍스트 생성을 위한 파이프라인 설정
         message = self.make_message(minutes)
+
         try:
-            outputs = self.pipe(
+            outputs = self.model.generate(
                 message,
                 do_sample=True,
                 truncation=True,
@@ -112,13 +113,31 @@ class SLLM:
                 top_k=5,
                 top_p=0.8,
                 repetition_penalty=1.2,
-                add_special_tokens=True,
+                max_length=self.model_max_length,
                 pad_token_id=self.tokenizer.eos_token_id,
                 eos_token_id=self.tokenizer.eos_token_id
             )
+            response = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+            
+            # message 입력의 길이 이후 부분만 추출
+            input_length = message['input_ids'].shape[1]  # message의 입력 길이
+            response = response[input_length:].strip()  # 입력 길이 이후 부분만 추출
+
+            # outputs = self.pipe(
+            #     message,
+            #     do_sample=True,
+            #     truncation=True,
+            #     temperature=0.4,
+            #     top_k=5,
+            #     top_p=0.8,
+            #     repetition_penalty=1.2,
+            #     add_special_tokens=True,
+            #     pad_token_id=self.tokenizer.eos_token_id,
+            #     eos_token_id=self.tokenizer.eos_token_id
+            # )
 
             # response = self.make_format(outputs[0]["generated_text"][len(message):])
-            response = outputs[0]["generated_text"][len(message):]
+            # response = outputs[0]["generated_text"][len(message):]
         except Exception as e:
             logger.debug(e)
             response = "요약문 생성에 실패했습니다."
