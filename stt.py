@@ -143,6 +143,7 @@ class STT:
             segments=list(segments)
             print("전사_처리_완료")
             transcription_segments = [{"start": seg.start, "end": seg.end, "text": seg.text} for seg in segments]
+            print("==========텍스트로 변환==========")
             print(transcription_segments)
             return transcription_segments
         except Exception as e:
@@ -156,6 +157,8 @@ class STT:
             result_aligned = whisperx.align(transcription_segments, self.align_model, self.metadata, audio_array, device=self.device)
             aligned_segments = result_aligned.get("segments", []) if isinstance(result_aligned, dict) else []
             print(f"실제 음성 세그먼트 {len(aligned_segments)}")
+            print("==========whisperX=========")
+            print(aligned_segments)
             return aligned_segments
         except Exception as e:
             print(f"후처리_에러: {e}")
@@ -284,7 +287,9 @@ class STT:
                     seg['start'] += i * chunk_duration
                     seg['end'] += i * chunk_duration
                 all_aligned_segments.extend(chunk_segments)
-
+        print("========= all aligned segments ==============")
+        print(all_aligned_segments)
+       
         matched_segments = self.match_speaker_to_segments(diarization, all_aligned_segments)
         json_content = self.save_transcriptions_as_json(matched_segments)
         if json_content is None:
