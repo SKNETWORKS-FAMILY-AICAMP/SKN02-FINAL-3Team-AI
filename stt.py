@@ -15,17 +15,12 @@ class STT:
     def __init__(self):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu') if not isinstance('cuda' if torch.cuda.is_available() else 'cpu', torch.device) else 'cuda' if torch.cuda.is_available() else 'cpu'
         self.whisper_model = self.load_whisper_model()
-        self.align_model, self.metadata = self.load_align_model()
         self.vad_pipeline = self.load_vad_pipeline()
         self.diarization_pipeline = self.load_diarization_pipeline()
 
     def load_whisper_model(self):
         print("위스퍼_모델_로딩중")
         return WhisperModel("deepdml/faster-whisper-large-v3-turbo-ct2", device='cuda', compute_type='int8')
-
-    def load_align_model(self):
-        print("후처리_모델_로딩중")
-        return whisperx.load_align_model(language_code='ko', device=self.device)
 
     def load_vad_pipeline(self):
         print("전처리_모델_로딩중")
@@ -150,20 +145,6 @@ class STT:
             print(f"전사_처리_실패: {e}")
             return None
 
-    def post_process_whisperx(self, transcription_segments, audio_segment):
-        print("WhisperX로_후처리_중")
-        try:
-            audio_array = np.array(audio_segment.get_array_of_samples()).astype(np.float32) / 32768.0
-            result_aligned = whisperx.align(transcription_segments, self.align_model, self.metadata, audio_array, device=self.device)
-            aligned_segments = result_aligned.get("segments", []) if isinstance(result_aligned, dict) else []
-            print(f"실제 음성 세그먼트 {len(aligned_segments)}")
-            print("==========whisperX=========")
-            print(aligned_segments)
-            return aligned_segments
-        except Exception as e:
-            print(f"후처리_에러: {e}")
-            return None
-
     def perform_diarization(self, vad_audio, num_speakers):
         print("화자_분리")
         try:
@@ -226,11 +207,7 @@ class STT:
         if transcription_segments is None:
             return None
 
-        aligned_segments = self.post_process_whisperx(transcription_segments, vad_audio)
-        if aligned_segments is None:
-            return None
-
-        return aligned_segments
+        return transcription_segments
     
     def merge_speaker_texts(self, json_content):
         merged_minutes = []
@@ -293,7 +270,7 @@ class STT:
         matched_segments = self.match_speaker_to_segments(diarization, all_aligned_segments)
         json_content = self.save_transcriptions_as_json(matched_segments)
         if json_content is None:
-            print("json_content_생성_실패")
+            print("json_content_생성_실패")s
             return
         
         content = {"minutes": self.merge_speaker_texts(json_content["minutes"])}
