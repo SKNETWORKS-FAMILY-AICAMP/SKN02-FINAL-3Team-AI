@@ -92,18 +92,20 @@ class SLLM:
     def sllm_response(self, minutes: dict):
         # 텍스트 생성을 위한 파이프라인 설정
         message = self.make_message(minutes)
-        
-        outputs = self.pipe(
-            message,
-            do_sample=True,
-            temperature=0.4,
-            top_k=5,
-            top_p=0.8,
-            repetition_penalty=1.2,
-            add_special_tokens=True,
-            pad_token_id=self.tokenizer.eos_token_id,
-            eos_token_id=self.tokenizer.eos_token_id
-        )
+        try:
+            outputs = self.pipe(
+                message,
+                do_sample=True,
+                temperature=0.4,
+                top_k=5,
+                top_p=0.8,
+                repetition_penalty=1.2,
+                add_special_tokens=True,
+                pad_token_id=self.tokenizer.eos_token_id,
+                eos_token_id=self.tokenizer.eos_token_id
+            )
 
-        response = self.make_format(outputs[0]["generated_text"][len(message):])
+            response = self.make_format(outputs[0]["generated_text"][len(message):])
+        except:
+            response = "요약문 생성에 실패했습니다."
         return response
