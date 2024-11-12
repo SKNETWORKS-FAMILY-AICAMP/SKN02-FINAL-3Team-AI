@@ -96,6 +96,7 @@ class SLLM:
             outputs = self.pipe(
                 message,
                 do_sample=True,
+                truncation=True,
                 temperature=0.4,
                 top_k=5,
                 top_p=0.8,
@@ -106,6 +107,7 @@ class SLLM:
             )
 
             response = self.make_format(outputs[0]["generated_text"][len(message):])
-        except:
+        except Exception as e:
+            print(e)
             response = "요약문 생성에 실패했습니다."
         return response
