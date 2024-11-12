@@ -9,7 +9,7 @@ class SLLM:
             bnb_4bit_use_double_quant=True, # 이중 양자화: 양자화를 적용하는 정수에 대해서도 양자화 적용
             bnb_4bit_compute_dtype=torch.bfloat16 # 연산 속도를 높이기 위해 사용 (default: torch.float32)
         )
-        self.model_path = './summary-finetuned-aya'
+        self.model_path = './finetuned-qwen-v2'
         self.model = AutoModelForCausalLM.from_pretrained(
             self.model_path,
             quantization_config=self.bnb_config,
@@ -47,6 +47,8 @@ class SLLM:
         - 중복된 내용은 제거하고, 각 논의 주제를 명확히 구분하여 작성하십시오.
 
         **요약문은 반드시 한글로 작성하십시오.**
+        **요약문에 한자와 중국어를 사용하지 마십시오**
+        **요약문에 번역문을 제공하지 마십시오!**
         """
 
         return prompt
