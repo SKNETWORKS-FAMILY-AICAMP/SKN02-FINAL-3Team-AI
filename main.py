@@ -80,7 +80,7 @@ def generate_minutes(from_django: FromDjango, b_task:BackgroundTasks):
 
 @app.post("/generate_summary/")
 def generate_summary(meeting_id, content, b_task:BackgroundTasks):
-    logger.debug("summary starts! ========> meeting_id:", meeting_id)
+    logger.debug(f"summary starts! ========> meeting_id: {meeting_id}")
     b_task.add_task(make_summary, meeting_id, content)
 
     response = {
