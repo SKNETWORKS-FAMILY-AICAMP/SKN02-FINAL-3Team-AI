@@ -1,4 +1,4 @@
-import os, logging, gc
+import os, logging
 from pydub import AudioSegment
 from faster_whisper import WhisperModel
 import whisperx
@@ -7,6 +7,7 @@ import torch
 import numpy as np
 import requests
 import io
+from io import BytesIO
 import soundfile as sf
 import librosa
 
@@ -16,18 +17,9 @@ logger.setLevel(logging.DEBUG)
 class STT:
     def __init__(self):
         self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+        self.whisper_model = self.load_whisper_model()
         self.vad_pipeline = self.load_vad_pipeline()
         self.diarization_pipeline = self.load_diarization_pipeline()
-
-    def start_stt(self):
-        self.vad_pipeline = self.vad_pipeline.to(torch.device('cuda'))
-        self.diarization_pipeline = self.diarization_pipeline.to(torch.device('cuda'))
-
-    def end_stt(self):
-        self.vad_pipeline = self.vad_pipeline.to(torch.device('cpu'))
-        self.diarization_pipeline = self.diarization_pipeline.to(torch.device('cpu'))
-        gc.collect()
-        torch.cuda.empty_cache()
 
     def load_whisper_model(self):
         logger.debug("위스퍼_모델_로딩중")
@@ -143,16 +135,12 @@ class STT:
 
     def transcribe_audio(self, audio_segment):
         logger.debug("전사_처리")
-        whisper_model = self.load_whisper_model()
         try:
             audio_array = np.array(audio_segment.get_array_of_samples()).astype(np.float32) / 32768.0
-            segments, _ = whisper_model.transcribe(audio_array,beam_size=5)
+            segments, _ = self.whisper_model.transcribe(audio_array,beam_size=5)
             segments=list(segments)
             transcription_segments = [{"start": seg.start, "end": seg.end, "text": seg.text} for seg in segments]
             logger.debug("전사_처리_완료")
-            del whisper_model
-            gc.collect()
-            torch.cuda.empty_cache()
             return transcription_segments
         except Exception as e:
             logger.debug(f"전사_처리_실패: {e}")
@@ -269,8 +257,6 @@ class STT:
         return merged_minutes
 
     def run(self, input_audio_url, num_speakers):
-        self.start_stt()
-
         download_audio = self.download_audio_to_memory(input_audio_url)
         if download_audio is None:
             logger.debug("오디오_다운로드_실패")
@@ -312,6 +298,4 @@ class STT:
         
         content = {"minutes": self.merge_speaker_texts(json_content["minutes"])}
         logger.debug("STT완료")
-
-        self.end_stt()
         return content

@@ -1,4 +1,4 @@
-import torch, logging, gc
+import torch, logging
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig, pipeline
 
 logger = logging.getLogger('uvicorn.error')
@@ -12,7 +12,7 @@ class SLLM:
             bnb_4bit_use_double_quant=True, # 이중 양자화: 양자화를 적용하는 정수에 대해서도 양자화 적용
             bnb_4bit_compute_dtype=torch.bfloat16 # 연산 속도를 높이기 위해 사용 (default: torch.float32)
         )
-        self.model_path = './summary-finetuned-aya'
+        self.model_path = './finetuned-qwen-v2'
 
         self.model = AutoModelForCausalLM.from_pretrained(
             self.model_path,
@@ -25,14 +25,6 @@ class SLLM:
         self.model_max_length = 128000
 
         self.pipe = pipeline("text-generation", device_map="auto", model=self.model, tokenizer=self.tokenizer, max_length=self.model_max_length)
-
-    def start_sllm(self):
-        self.model = self.model.to(torch.device('cuda'))
-
-    def end_sllm(self):
-        self.model = self.model.to(torch.device('cpu'))
-        gc.collect()
-        torch.cuda.empty_cache()
 
     def get_prompt(self):
         # prompt = """아래 지시사항에 따라 사용자가 입력하는 회의록을 요약하십시오.
@@ -162,7 +154,6 @@ class SLLM:
 
     def sllm_response(self, minutes: dict):
         logger.debug("sLLM Response Requested!")
-        self.start_sllm()
 
         message = self.make_message(minutes)
 
@@ -208,8 +199,6 @@ class SLLM:
             logger.debug(response)
 
             # response = self.make_format(outputs[0]["generated_text"][len(message):])
-
-            self.end_sllm()
         except Exception as e:
             logger.debug(e)
             response = "요약문 생성에 실패했습니다."
