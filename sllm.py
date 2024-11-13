@@ -1,13 +1,11 @@
 import torch, logging
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig, pipeline
-from accelerate import PartialState, Accelerator
 
 logger = logging.getLogger('uvicorn.error')
 logger.setLevel(logging.DEBUG)
 
 class SLLM:
     def __init__(self):
-        self.accelerator = Accelerator()
         self.bnb_config = BitsAndBytesConfig(
             load_in_4bit=True, # 모델을 4비트 정밀도로 로드
             bnb_4bit_quant_type="nf4", # 4비트 NormalFloat 양자화: 양자화된 파라미터의 분포 범위를 정규분포 내로 억제하여 정밀도 저하 방지
@@ -16,15 +14,12 @@ class SLLM:
         )
         self.model_path = './finetuned-qwen-v2'
 
-        max_memory_mapping = {0: "14GB", 1: "14GB", 2:"14GB", 3:"14GB"}
-        model = AutoModelForCausalLM.from_pretrained(
+        self.model = AutoModelForCausalLM.from_pretrained(
             self.model_path,
             quantization_config=self.bnb_config,
             device_map="auto",
             torch_dtype=torch.bfloat16,
-            max_memory=max_memory_mapping
         )
-        self.model = self.accelerator.prepare(model)
 
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_path)
         self.model_max_length = 128000
@@ -89,12 +84,10 @@ class SLLM:
         minutes = self.get_minutes(minutes)
 
         message = f"### system:\n{prompt}" + self.tokenizer.eos_token + f"\n\n### user:\n{minutes}" + self.tokenizer.eos_token + f"\n\n### assistant:\n"
+        tokenized_message = self.tokenizer(message, return_tensors="pt", truncation=True, max_length=self.model_max_length)
         
-        return message
-
-        # tokenized_message = self.tokenizer(message, return_tensors="pt", truncation=True, max_length=self.model_max_length)
-        
-        # return tokenized_message
+        return tokenized_message
+        # return message
         
         # messages = [
         #     {"role": "system", "content": prompt},
@@ -116,45 +109,45 @@ class SLLM:
         # 텍스트 생성을 위한 파이프라인 설정
         message = self.make_message(minutes)
 
-        # try:
-        #     outputs = self.model.generate(
-        #         input_ids=message['input_ids'],
-        #         attention_mask=message['attention_mask'],
-        #         do_sample=True,
-        #         temperature=0.4,
-        #         top_k=5,
-        #         top_p=0.8,
-        #         repetition_penalty=1.2,
-        #         max_length=self.model_max_length,
-        #         pad_token_id=self.tokenizer.eos_token_id,
-        #         eos_token_id=self.tokenizer.eos_token_id
-        #     )
-        #     response = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
-
-        #     assistant_marker = "### assistant:"
-        #     start_idx = response.find(assistant_marker)
-
-        #     if start_idx != -1:
-        #         response = response[start_idx + len(assistant_marker):].strip()
-        #     else:
-        #         response = response.strip()
-        
         try:
-            outputs = self.pipe(
-                message,
+            outputs = self.model.generate(
+                input_ids=message['input_ids'],
+                attention_mask=message['attention_mask'],
                 do_sample=True,
-                truncation=True,
                 temperature=0.4,
                 top_k=5,
                 top_p=0.8,
                 repetition_penalty=1.2,
-                add_special_tokens=True,
+                max_length=self.model_max_length,
                 pad_token_id=self.tokenizer.eos_token_id,
                 eos_token_id=self.tokenizer.eos_token_id
             )
+            response = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
 
-            # response = self.make_format(outputs[0]["generated_text"][len(message):])
-            response = outputs[0]["generated_text"][len(message):]
+            assistant_marker = "### assistant:"
+            start_idx = response.find(assistant_marker)
+
+            if start_idx != -1:
+                response = response[start_idx + len(assistant_marker):].strip()
+            else:
+                response = response.strip()
+        
+        # try:
+        #     outputs = self.pipe(
+        #         message,
+        #         do_sample=True,
+        #         truncation=True,
+        #         temperature=0.4,
+        #         top_k=5,
+        #         top_p=0.8,
+        #         repetition_penalty=1.2,
+        #         add_special_tokens=True,
+        #         pad_token_id=self.tokenizer.eos_token_id,
+        #         eos_token_id=self.tokenizer.eos_token_id
+        #     )
+
+        #     # response = self.make_format(outputs[0]["generated_text"][len(message):])
+        #     response = outputs[0]["generated_text"][len(message):]
         except Exception as e:
             logger.debug(e)
             response = "요약문 생성에 실패했습니다."
