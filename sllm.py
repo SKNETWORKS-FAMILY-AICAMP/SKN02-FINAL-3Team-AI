@@ -26,9 +26,7 @@ class SLLM:
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_path)
         self.model_max_length = 128000
 
-        distributed_state = PartialState()
-        pipe = pipeline("text-generation", device_map="auto", model=self.model, tokenizer=self.tokenizer, max_length=self.model_max_length)
-        self.pipe = pipe.to(distributed_state.device)
+        self.pipe = pipeline("text-generation", device_map="auto", model=self.model, tokenizer=self.tokenizer, max_length=self.model_max_length)
 
     def get_prompt(self):
         prompt = """아래 지시사항에 따라 사용자가 입력하는 회의록을 요약하십시오.
