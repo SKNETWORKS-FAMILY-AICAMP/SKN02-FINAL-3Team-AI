@@ -1,6 +1,6 @@
 import torch, logging
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig, pipeline
-from accelerate import Accelerator
+from accelerate import PartialState, Accelerator
 
 logger = logging.getLogger('uvicorn.error')
 logger.setLevel(logging.DEBUG)
@@ -21,12 +21,14 @@ class SLLM:
             device_map="auto",
             torch_dtype=torch.bfloat16
         )
-        logger.debug("Let's use", torch.cuda.device_count(), "GPUs!")
-        self.model = torch.nn.DataParallel(model).cuda()
+        self.model = self.accelerator.prepare(model)
 
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_path)
         self.model_max_length = 128000
-        self.pipe = pipeline("text-generation", device_map="auto", model=self.model, tokenizer=self.tokenizer, max_length=self.model_max_length)
+
+        distributed_state = PartialState()
+        pipe = pipeline("text-generation", device_map="auto", model=self.model, tokenizer=self.tokenizer, max_length=self.model_max_length)
+        self.pipe = pipe.to(distributed_state.device)
 
     def get_prompt(self):
         prompt = """아래 지시사항에 따라 사용자가 입력하는 회의록을 요약하십시오.
@@ -86,7 +88,13 @@ class SLLM:
         minutes = self.get_minutes(minutes)
 
         message = f"### system:\n{prompt}" + self.tokenizer.eos_token + f"\n\n### user:\n{minutes}" + self.tokenizer.eos_token + f"\n\n### assistant:\n"
-        tokenized_message = self.tokenizer(message, return_tensors="pt", truncation=True, max_length=self.model_max_length)
+        
+        return message
+
+        # tokenized_message = self.tokenizer(message, return_tensors="pt", truncation=True, max_length=self.model_max_length)
+        
+        # return tokenized_message
+        
         # messages = [
         #     {"role": "system", "content": prompt},
         #     {"role": "user", "content": minutes},
@@ -98,8 +106,6 @@ class SLLM:
         #     add_generation_prompt=True,
         #     return_tensors="pt"
         # )
-        
-        return tokenized_message
     
     # def make_format(self, response: str):
     #     start_idx = response.find('1.')            
@@ -109,44 +115,45 @@ class SLLM:
         # 텍스트 생성을 위한 파이프라인 설정
         message = self.make_message(minutes)
 
+        # try:
+        #     outputs = self.model.generate(
+        #         input_ids=message['input_ids'],
+        #         attention_mask=message['attention_mask'],
+        #         do_sample=True,
+        #         temperature=0.4,
+        #         top_k=5,
+        #         top_p=0.8,
+        #         repetition_penalty=1.2,
+        #         max_length=self.model_max_length,
+        #         pad_token_id=self.tokenizer.eos_token_id,
+        #         eos_token_id=self.tokenizer.eos_token_id
+        #     )
+        #     response = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+
+        #     assistant_marker = "### assistant:"
+        #     start_idx = response.find(assistant_marker)
+
+        #     if start_idx != -1:
+        #         response = response[start_idx + len(assistant_marker):].strip()
+        #     else:
+        #         response = response.strip()
+        
         try:
-            outputs = self.model.generate(
-                input_ids=message['input_ids'],
-                attention_mask=message['attention_mask'],
+            outputs = self.pipe(
+                message,
                 do_sample=True,
+                truncation=True,
                 temperature=0.4,
                 top_k=5,
                 top_p=0.8,
                 repetition_penalty=1.2,
-                max_length=self.model_max_length,
+                add_special_tokens=True,
                 pad_token_id=self.tokenizer.eos_token_id,
                 eos_token_id=self.tokenizer.eos_token_id
             )
-            response = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
-
-            assistant_marker = "### assistant:"
-            start_idx = response.find(assistant_marker)
-
-            if start_idx != -1:
-                response = response[start_idx + len(assistant_marker):].strip()
-            else:
-                response = response.strip()
-
-            # outputs = self.pipe(
-            #     message,
-            #     do_sample=True,
-            #     truncation=True,
-            #     temperature=0.4,
-            #     top_k=5,
-            #     top_p=0.8,
-            #     repetition_penalty=1.2,
-            #     add_special_tokens=True,
-            #     pad_token_id=self.tokenizer.eos_token_id,
-            #     eos_token_id=self.tokenizer.eos_token_id
-            # )
 
             # response = self.make_format(outputs[0]["generated_text"][len(message):])
-            # response = outputs[0]["generated_text"][len(message):]
+            response = outputs[0]["generated_text"][len(message):]
         except Exception as e:
             logger.debug(e)
             response = "요약문 생성에 실패했습니다."
