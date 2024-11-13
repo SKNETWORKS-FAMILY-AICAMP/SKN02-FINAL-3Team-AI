@@ -20,12 +20,12 @@ class STT:
         self.diarization_pipeline = self.load_diarization_pipeline()
 
     def start_stt(self):
-        self.vad_pipeline = self.vad_pipeline.to('cuda')
-        self.diarization_pipeline = self.diarization_pipeline.to('cuda')
+        self.vad_pipeline = self.vad_pipeline.to(torch.device('cuda'))
+        self.diarization_pipeline = self.diarization_pipeline.to(torch.device('cuda'))
 
     def end_stt(self):
-        self.vad_pipeline = self.vad_pipeline.to('cpu')
-        self.diarization_pipeline = self.diarization_pipeline.to('cpu')
+        self.vad_pipeline = self.vad_pipeline.to(torch.device('cpu'))
+        self.diarization_pipeline = self.diarization_pipeline.to(torch.device('cpu'))
         gc.collect()
         torch.cuda.empty_cache()
 

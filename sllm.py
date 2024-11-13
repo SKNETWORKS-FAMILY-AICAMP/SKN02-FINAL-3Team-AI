@@ -27,10 +27,10 @@ class SLLM:
         self.pipe = pipeline("text-generation", device_map="auto", model=self.model, tokenizer=self.tokenizer, max_length=self.model_max_length)
 
     def start_sllm(self):
-        self.model = self.model.to('cuda')
+        self.model = self.model.to(torch.device('cuda'))
 
     def end_sllm(self):
-        self.model = self.model.to('cpu')
+        self.model = self.model.to(torch.device('cpu'))
         gc.collect()
         torch.cuda.empty_cache()
 
