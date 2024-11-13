@@ -114,23 +114,24 @@ class SLLM:
         prompt = self.get_prompt()
         minutes = self.get_minutes(minutes)
 
-        message = f"### system:\n{prompt}" + self.tokenizer.eos_token + f"\n\n### user:\n{minutes}" + self.tokenizer.eos_token + f"\n\n### assistant:\n"
-        tokenized_message = self.tokenizer(message, return_tensors="pt", truncation=True, max_length=self.model_max_length)
+        # message = f"### system:\n{prompt}" + self.tokenizer.eos_token + f"\n\n### user:\n{minutes}" + self.tokenizer.eos_token + f"\n\n### assistant:\n"
+        # tokenized_message = self.tokenizer(message, return_tensors="pt", truncation=True, max_length=self.model_max_length)
         
-        return tokenized_message
-        # return message
+        # return tokenized_message
         
-        # messages = [
-        #     {"role": "system", "content": prompt},
-        #     {"role": "user", "content": minutes},
-        # ]
+        messages = [
+            {"role": "system", "content": prompt},
+            {"role": "user", "content": minutes},
+        ]
 
-        # message = self.tokenizer.apply_chat_template(
-        #     messages,
-        #     tokenize=True,
-        #     add_generation_prompt=True,
-        #     return_tensors="pt"
-        # )
+        message = self.tokenizer.apply_chat_template(
+            messages,
+            tokenize=False,
+            add_generation_prompt=True,
+            return_tensors="pt"
+        )
+
+        return message
     
     def make_format(self, response: str):
         start_idx = response.find('**1.')
