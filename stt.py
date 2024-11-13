@@ -76,7 +76,7 @@ class STT:
         else:
             samples = samples.reshape(1, -1)
 
-        waveform = torch.from_numpy(samples)
+        waveform = torch.from_numpy(samples).unsqueeze(0).to(self.device)
 
         try:
             vad = self.vad_pipeline({"waveform": waveform, "sample_rate": audio.frame_rate})
