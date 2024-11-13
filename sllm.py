@@ -26,6 +26,14 @@ class SLLM:
 
         self.pipe = pipeline("text-generation", device_map="auto", model=self.model, tokenizer=self.tokenizer, max_length=self.model_max_length)
 
+    def start_sllm(self):
+        self.model = self.model.to('cuda')
+
+    def end_sllm(self):
+        self.model = self.model.to('cpu')
+        gc.collect()
+        torch.cuda.empty_cache()
+
     def get_prompt(self):
         # prompt = """아래 지시사항에 따라 사용자가 입력하는 회의록을 요약하십시오.
 
@@ -153,9 +161,8 @@ class SLLM:
         return response[start_idx-1:]
 
     def sllm_response(self, minutes: dict):
-        gc.collect()
-        torch.cuda.empty_cache()
         logger.debug("sLLM Response Requested!")
+        self.start_sllm()
 
         message = self.make_message(minutes)
 
@@ -201,6 +208,8 @@ class SLLM:
             logger.debug(response)
 
             # response = self.make_format(outputs[0]["generated_text"][len(message):])
+
+            self.end_sllm()
         except Exception as e:
             logger.debug(e)
             response = "요약문 생성에 실패했습니다."

@@ -1,4 +1,4 @@
-import os, logging
+import os, logging, gc
 from pydub import AudioSegment
 from faster_whisper import WhisperModel
 import whisperx
@@ -7,7 +7,6 @@ import torch
 import numpy as np
 import requests
 import io
-from io import BytesIO
 import soundfile as sf
 import librosa
 
@@ -20,6 +19,18 @@ class STT:
         self.whisper_model = self.load_whisper_model()
         self.vad_pipeline = self.load_vad_pipeline()
         self.diarization_pipeline = self.load_diarization_pipeline()
+
+    def start_stt(self):
+        self.whisper_model = self.whisper_model.to('cuda')
+        self.vad_pipeline = self.vad_pipeline.to('cuda')
+        self.diarization_pipeline = self.diarization_pipeline.to('cuda')
+
+    def end_stt(self):
+        self.whisper_model = self.whisper_model.to('cpu')
+        self.vad_pipeline = self.vad_pipeline.to('cpu')
+        self.diarization_pipeline = self.diarization_pipeline.to('cpu')
+        gc.collect()
+        torch.cuda.empty_cache()
 
     def load_whisper_model(self):
         logger.debug("위스퍼_모델_로딩중")
@@ -257,6 +268,8 @@ class STT:
         return merged_minutes
 
     def run(self, input_audio_url, num_speakers):
+        self.start_stt()
+
         download_audio = self.download_audio_to_memory(input_audio_url)
         if download_audio is None:
             logger.debug("오디오_다운로드_실패")
@@ -298,4 +311,6 @@ class STT:
         
         content = {"minutes": self.merge_speaker_texts(json_content["minutes"])}
         logger.debug("STT완료")
+
+        self.end_stt()
         return content
