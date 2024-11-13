@@ -15,11 +15,14 @@ class SLLM:
             bnb_4bit_compute_dtype=torch.bfloat16 # 연산 속도를 높이기 위해 사용 (default: torch.float32)
         )
         self.model_path = './finetuned-qwen-v2'
+
+        max_memory_mapping = {0: "14GB", 1: "14GB", 2:"14GB", 3:"14GB"}
         model = AutoModelForCausalLM.from_pretrained(
             self.model_path,
             quantization_config=self.bnb_config,
             device_map="auto",
-            torch_dtype=torch.bfloat16
+            torch_dtype=torch.bfloat16,
+            max_memory=max_memory_mapping
         )
         self.model = self.accelerator.prepare(model)
 
