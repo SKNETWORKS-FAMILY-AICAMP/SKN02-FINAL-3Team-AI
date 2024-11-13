@@ -16,17 +16,14 @@ logger.setLevel(logging.DEBUG)
 class STT:
     def __init__(self):
         self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-        self.whisper_model = self.load_whisper_model()
         self.vad_pipeline = self.load_vad_pipeline()
         self.diarization_pipeline = self.load_diarization_pipeline()
 
     def start_stt(self):
-        self.whisper_model = self.whisper_model.to('cuda')
         self.vad_pipeline = self.vad_pipeline.to('cuda')
         self.diarization_pipeline = self.diarization_pipeline.to('cuda')
 
     def end_stt(self):
-        self.whisper_model = self.whisper_model.to('cpu')
         self.vad_pipeline = self.vad_pipeline.to('cpu')
         self.diarization_pipeline = self.diarization_pipeline.to('cpu')
         gc.collect()
@@ -146,12 +143,16 @@ class STT:
 
     def transcribe_audio(self, audio_segment):
         logger.debug("전사_처리")
+        whisper_model = self.load_whisper_model()
         try:
             audio_array = np.array(audio_segment.get_array_of_samples()).astype(np.float32) / 32768.0
-            segments, _ = self.whisper_model.transcribe(audio_array,beam_size=5)
+            segments, _ = whisper_model.transcribe(audio_array,beam_size=5)
             segments=list(segments)
             transcription_segments = [{"start": seg.start, "end": seg.end, "text": seg.text} for seg in segments]
             logger.debug("전사_처리_완료")
+            del whisper_model
+            gc.collect()
+            torch.cuda.empty_cache()
             return transcription_segments
         except Exception as e:
             logger.debug(f"전사_처리_실패: {e}")
