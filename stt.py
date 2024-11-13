@@ -139,10 +139,8 @@ class STT:
             audio_array = np.array(audio_segment.get_array_of_samples()).astype(np.float32) / 32768.0
             segments, _ = self.whisper_model.transcribe(audio_array,beam_size=5)
             segments=list(segments)
-            logger.debug("전사_처리_완료")
             transcription_segments = [{"start": seg.start, "end": seg.end, "text": seg.text} for seg in segments]
-            logger.debug("==========텍스트로 변환==========")
-            logger.debug(transcription_segments)
+            logger.debug("전사_처리_완료")
             return transcription_segments
         except Exception as e:
             logger.debug(f"전사_처리_실패: {e}")
@@ -219,8 +217,6 @@ class STT:
                 })
             
             content = {"minutes": transcriptions}
-            logger.debug("========content=======")
-            logger.debug(content)
             return content
         except Exception as e:
             logger.debug(f"json형태로_변환실패: {e}")
@@ -293,8 +289,6 @@ class STT:
                     seg['start'] += i * chunk_duration
                     seg['end'] += i * chunk_duration
                 all_aligned_segments.extend(chunk_segments)
-        logger.debug("========= all aligned segments ==============")
-        logger.debug(all_aligned_segments)
        
         matched_segments = self.match_speaker_to_segments(diarization, all_aligned_segments)
         json_content = self.save_transcriptions_as_json(matched_segments)
@@ -304,5 +298,4 @@ class STT:
         
         content = {"minutes": self.merge_speaker_texts(json_content["minutes"])}
         logger.debug("STT완료")
-        logger.debug(content)
         return content

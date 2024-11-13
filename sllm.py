@@ -1,4 +1,4 @@
-import torch, logging
+import torch, logging, gc
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig, pipeline
 
 logger = logging.getLogger('uvicorn.error')
@@ -149,11 +149,14 @@ class SLLM:
         if start_idx == -1:
             start_idx = response.find('1.')
         if start_idx == -1:
-            start_idx = 0
-        return " " + response[start_idx:]
+            start_idx = 1
+        return response[start_idx-1:]
 
     def sllm_response(self, minutes: dict):
-        # 텍스트 생성을 위한 파이프라인 설정
+        gc.collect()
+        torch.cuda.empty_cache()
+        logger.debug("sLLM Response Requested!")
+
         message = self.make_message(minutes)
 
         # try:
@@ -193,8 +196,11 @@ class SLLM:
                 eos_token_id=self.tokenizer.eos_token_id
             )
 
-            response = self.make_format(outputs[0]["generated_text"][len(message):])
-            # response = outputs[0]["generated_text"][len(message):]
+            logger.debug("요약문 생성 완료")
+            response = outputs[0]["generated_text"][len(message):]
+            logger.debug(response)
+
+            # response = self.make_format(outputs[0]["generated_text"][len(message):])
         except Exception as e:
             logger.debug(e)
             response = "요약문 생성에 실패했습니다."
