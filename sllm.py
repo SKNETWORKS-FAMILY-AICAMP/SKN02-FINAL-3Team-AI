@@ -197,10 +197,11 @@ class SLLM:
                 message,
                 do_sample=True,
                 truncation=True,
-                temperature=0.4,
+                temperature=0.2,
+                # temperature=0.4,
                 top_k=5,
                 top_p=0.8,
-                repetition_penalty=1.2,
+                # repetition_penalty=1.2,
                 add_special_tokens=True,
                 pad_token_id=self.tokenizer.eos_token_id,
                 eos_token_id=self.tokenizer.eos_token_id
