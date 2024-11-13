@@ -150,7 +150,7 @@ class SLLM:
             start_idx = response.find('1.')
         if start_idx == -1:
             start_idx = 0
-        return response[start_idx:]
+        return " " + response[start_idx:]
 
     def sllm_response(self, minutes: dict):
         # 텍스트 생성을 위한 파이프라인 설정
