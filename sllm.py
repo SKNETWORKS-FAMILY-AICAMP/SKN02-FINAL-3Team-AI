@@ -22,8 +22,8 @@ class SLLM:
             torch_dtype=torch.bfloat16
         )
         logger.debug("Let's use", torch.cuda.device_count(), "GPUs!")
-        self.model = torch.nn.DataParallel(model)
-        
+        self.model = torch.nn.DataParallel(model).cuda()
+
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_path)
         self.model_max_length = 128000
         self.pipe = pipeline("text-generation", device_map="auto", model=self.model, tokenizer=self.tokenizer, max_length=self.model_max_length)
@@ -151,3 +151,4 @@ class SLLM:
             logger.debug(e)
             response = "요약문 생성에 실패했습니다."
         return response
+    
