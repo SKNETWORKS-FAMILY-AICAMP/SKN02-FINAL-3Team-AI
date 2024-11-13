@@ -16,14 +16,14 @@ logger.setLevel(logging.DEBUG)
 
 class STT:
     def __init__(self):
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu') if not isinstance('cuda' if torch.cuda.is_available() else 'cpu', torch.device) else 'cuda' if torch.cuda.is_available() else 'cpu'
+        self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
         self.whisper_model = self.load_whisper_model()
         self.vad_pipeline = self.load_vad_pipeline()
         self.diarization_pipeline = self.load_diarization_pipeline()
 
     def load_whisper_model(self):
         logger.debug("위스퍼_모델_로딩중")
-        return WhisperModel("deepdml/faster-whisper-large-v3-turbo-ct2", device='cuda', compute_type='int8')
+        return WhisperModel("deepdml/faster-whisper-large-v3-turbo-ct2", device='cuda:0', compute_type='int8')
 
     def load_vad_pipeline(self):
         logger.debug("전처리_모델_로딩중")
@@ -76,7 +76,7 @@ class STT:
         else:
             samples = samples.reshape(1, -1)
 
-        waveform = torch.from_numpy(samples).unsqueeze(0).to(self.device)
+        waveform = torch.from_numpy(samples)
 
         try:
             vad = self.vad_pipeline({"waveform": waveform, "sample_rate": audio.frame_rate})
