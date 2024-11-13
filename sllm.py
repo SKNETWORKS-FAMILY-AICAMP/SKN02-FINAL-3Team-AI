@@ -21,7 +21,9 @@ class SLLM:
             device_map="auto",
             torch_dtype=torch.bfloat16
         )
-        self.model = self.accelerator.prepare(model)
+        logger.debug("Let's use", torch.cuda.device_count(), "GPUs!")
+        self.model = torch.nn.DataParallel(model)
+        
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_path)
         self.model_max_length = 128000
         self.pipe = pipeline("text-generation", device_map="auto", model=self.model, tokenizer=self.tokenizer, max_length=self.model_max_length)
