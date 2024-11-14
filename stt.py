@@ -200,7 +200,7 @@ class STT:
             print(turn)
         return converted_diarization
 
-    def match_speaker_to_segments(D_segments, all_aligned_segments):
+    def match_speaker_to_segments(self, D_segments, all_aligned_segments):
         mapped_segments = []
 
         for text_seg in all_aligned_segments:
