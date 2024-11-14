@@ -26,7 +26,7 @@ class STT:
         logger.debug("위스퍼_모델_로딩중")
         return WhisperModel("deepdml/faster-whisper-large-v3-turbo-ct2", device='cuda', compute_type='int8', device_index=[0])
     
-    def loadalign_model(self):
+    def load_align_model(self):
         print("후처리모델_로딩중")
         return whisperx.load_align_model(language_code='ko', device=self.device)
 
