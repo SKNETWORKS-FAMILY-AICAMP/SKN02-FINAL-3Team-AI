@@ -18,6 +18,7 @@ class STT:
     def __init__(self):
         self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
         self.whisper_model = self.load_whisper_model()
+        self.align_model, self.metadata = self.load_align_model()
         self.vad_pipeline = self.load_vad_pipeline()
         self.diarization_pipeline = self.load_diarization_pipeline()
 
@@ -139,12 +140,29 @@ class STT:
             audio_array = np.array(audio_segment.get_array_of_samples()).astype(np.float32) / 32768.0
             segments, _ = self.whisper_model.transcribe(audio_array,beam_size=5)
             segments=list(segments)
-            transcription_segments = [{"start": seg.start, "end": seg.end, "text": seg.text} for seg in segments]
             logger.debug("전사_처리_완료")
+            transcription_segments = [{"start": seg.start, "end": seg.end, "text": seg.text} for seg in segments]
+            logger.debug("==========텍스트로 변환==========")
+            logger.debug(transcription_segments)
             return transcription_segments
         except Exception as e:
             logger.debug(f"전사_처리_실패: {e}")
             return None
+
+    def post_process_whisperx(self, transcription_segments, audio_segment):
+            print("WhisperX로_후처리_중")
+            try:
+                audio_array = np.array(audio_segment.get_array_of_samples()).astype(np.float32) / 32768.0
+                result_aligned = whisperx.align(transcription_segments, self.align_model, self.metadata, audio_array, device=self.device)
+                aligned_segments = result_aligned.get("segments", []) if isinstance(result_aligned, dict) else []
+                print(f"실제 음성 세그먼트 {len(aligned_segments)}")
+                print("==========whisperX=========")
+                print(aligned_segments)
+                return aligned_segments
+            except Exception as e:
+                print(f"후처리_에러: {e}")
+                return None
+
 
     def perform_diarization(self, vad_audio, num_speakers):
         logger.debug("화자_분리")
@@ -162,43 +180,65 @@ class STT:
         except Exception as e:
             logger.debug(f"화자분리_실패: {e}")
             return None
+    
+    def convert_diarization(self, diarization):
+        converted_diarization = []
+        for turn in diarization.itertracks(yield_label=True):
+            converted_turn = {
+                "start": turn[0].start,
+                "end": turn[0].end,
+                "speaker": turn[2]
+            }
+            converted_diarization.append(converted_turn)
 
-    def match_speaker_to_segments(self, diarization, all_aligned_segments):
-        logger.debug("화자_매칭중")
-        matched_segments = []
+        print("Converted diarization:")
+        for turn in converted_diarization:
+            print(turn)
+        return converted_diarization
+
+    def match_speaker_to_segments(D_segments, all_aligned_segments):
+        mapped_segments = []
 
         for text_seg in all_aligned_segments:
             text_start = text_seg['start']
             text_end = text_seg['end']
-        
-            # 텍스트 구간에 맞는 화자 찾기
-            speaker_found = False
-            for dia_seg in diarization.itertracks(yield_label=True):
-                dia_start = dia_seg[0].start
-                dia_end = dia_seg[0].end
-                speaker = dia_seg[2]
+            max_overlap_ratio = 0
+            best_speaker = 'unknown'
 
-                # 텍스트 구간이 화자 구간과 겹치는지 확인
-                if text_start < dia_end and text_end > dia_start:
-                    matched_segments.append({
-                        'start': text_start,
-                        'end': text_end,
-                        'text': text_seg['text'],
-                        'speaker': speaker
-                    })
-                    speaker_found = True
-                    break
+            for dia_seg in D_segments:
+                dia_start = dia_seg['start']
+                dia_end = dia_seg['end']
+                speaker = dia_seg['speaker']
 
-            # 매칭되는 화자가 없을 경우 'unknown' 처리
-            if not speaker_found:
-                matched_segments.append({
-                    'start': text_start,
-                    'end': text_end,
-                    'text': text_seg['text'],
-                    'speaker': 'unknown'
-                })
-        logger.debug("화자_매칭_완료")
-        return matched_segments
+                # 겹치는 구간 계산
+                overlap_start = max(text_start, dia_start)
+                overlap_end = min(text_end, dia_end)
+                overlap_duration = max(0, overlap_end - overlap_start)
+
+                if overlap_duration > 0:
+                    text_duration = text_end - text_start
+                    dia_duration = dia_end - dia_start
+
+                    # 중첩 비율 계산 (텍스트 구간 대비 중첩 비율)
+                    overlap_ratio = overlap_duration / text_duration
+
+                    # 가장 높은 중첩 비율을 가진 화자 선택
+                    if overlap_ratio > max_overlap_ratio:
+                        max_overlap_ratio = overlap_ratio
+                        best_speaker = speaker
+
+            # 가장 적합한 화자로 매핑
+            mapped_segments.append({
+                'start': text_start,
+                'end': text_end,
+                'text': text_seg['text'],
+                'speaker': best_speaker
+            })
+
+        logging.debug("======mapped_segments=======")
+        logging.debug(mapped_segments)
+        print(mapped_segments)
+        return mapped_segments
 
     def save_transcriptions_as_json(self, matched_segments):
         logger.debug("json형태로_변환중")
@@ -217,6 +257,8 @@ class STT:
                 })
             
             content = {"minutes": transcriptions}
+            logger.debug("========content=======")
+            logger.debug(content)
             return content
         except Exception as e:
             logger.debug(f"json형태로_변환실패: {e}")
@@ -231,8 +273,12 @@ class STT:
         transcription_segments = self.transcribe_audio(vad_audio)
         if transcription_segments is None:
             return None
+        
+        aligned_segments = self.post_process_whisperx(transcription_segments, vad_audio)
+        if aligned_segments is None:
+            return None
 
-        return transcription_segments
+        return aligned_segments
     
     def merge_speaker_texts(self, json_content):
         merged_minutes = []
@@ -276,6 +322,11 @@ class STT:
         if diarization is None:
             logger.debug("화자분리_실패")
             return None
+        
+        D_segments = self.convert_diarization(diarization)
+        if D_segments is None:
+            logger.debug("segments 맞추기")
+            return None
 
         chunks = self.split_audio(vad_audio)
 
@@ -289,8 +340,10 @@ class STT:
                     seg['start'] += i * chunk_duration
                     seg['end'] += i * chunk_duration
                 all_aligned_segments.extend(chunk_segments)
+        logger.debug("========= all aligned segments ==============")
+        logger.debug(all_aligned_segments)
        
-        matched_segments = self.match_speaker_to_segments(diarization, all_aligned_segments)
+        matched_segments = self.match_speaker_to_segments(D_segments, all_aligned_segments)
         json_content = self.save_transcriptions_as_json(matched_segments)
         if json_content is None:
             print("json_content_생성_실패")
@@ -298,4 +351,5 @@ class STT:
         
         content = {"minutes": self.merge_speaker_texts(json_content["minutes"])}
         logger.debug("STT완료")
+        logger.debug(content)
         return content
